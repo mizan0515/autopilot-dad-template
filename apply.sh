@@ -226,10 +226,16 @@ if [ -d "$WORK/template/locales/$LANG_ARG" ]; then
 fi
 
 # --- hooks ----------------------------------------------------------------
-if [ -d "$TARGET/.autopilot/hooks" ]; then
+# Prefer top-level .githooks/ (canonical validator chain).
+# Fall back to .autopilot/hooks/ for legacy layouts.
+if [ -d "$TARGET/.githooks" ]; then
+  chmod +x "$TARGET/.githooks/pre-commit" 2>/dev/null || true
+  git config core.hooksPath .githooks
+  echo "[apply] hooks registered (core.hooksPath=.githooks)"
+elif [ -d "$TARGET/.autopilot/hooks" ]; then
   chmod +x "$TARGET/.autopilot/hooks/"*.sh "$TARGET/.autopilot/hooks/pre-commit" "$TARGET/.autopilot/hooks/commit-msg" 2>/dev/null || true
   git config core.hooksPath .autopilot/hooks
-  echo "[apply] hooks registered"
+  echo "[apply] hooks registered (core.hooksPath=.autopilot/hooks)"
 fi
 
 # --- cleanup --------------------------------------------------------------
@@ -256,6 +262,6 @@ Relay:    $RELAY_DISPLAY
 Next steps:
   1. Review .autopilot/config.json and .autopilot/BACKLOG.md (replace seed tasks).
   2. Review PROJECT-RULES.md / CLAUDE.md / AGENTS.md at repo root and fill in project-specific guardrails.
-  3. git add .autopilot PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
+  3. git add .autopilot .githooks .github tools PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
   4. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
 HINT
