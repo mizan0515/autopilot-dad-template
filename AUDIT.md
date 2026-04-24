@@ -1,6 +1,6 @@
-# AUDIT — 43-row incident-prevention matrix
+# AUDIT — 48-row incident-prevention matrix
 
-Phase 7 first-pass audit (rows 1–17) covered the silent-stall chain from `card-climber/.autopilot/INCIDENTS.md` §1–§3. Phases 8–10 (round-2 audit) extended the matrix with 26 more rows drawn from `D:\Unity\card game\.autopilot\PITFALLS.md` and `D:\cardgame-dad-relay\.autopilot\PITFALLS.md` + governance docs.
+Phase 7 first-pass audit (rows 1–17) covered the silent-stall chain from `card-climber/.autopilot/INCIDENTS.md` §1–§3. Phases 8–10 (round-2 audit) extended the matrix with 26 more rows drawn from `D:\Unity\card game\.autopilot\PITFALLS.md` and `D:\cardgame-dad-relay\.autopilot\PITFALLS.md` + governance docs. Round-3 (rows 44–48) came from a real first-time-installer dogfood test on a brand-new project — every bug a fresh operator would actually hit.
 
 | # | Incident pattern | Template safeguard | Source PR | Status |
 |---|---|---|---|---|
@@ -55,9 +55,21 @@ Sourced from the audit of `D:\Unity\card game` + `D:\cardgame-dad-relay` after p
 | 42 | PROMPT boot cost dominates maintenance iters | `locales/{en,ko}/.autopilot/PROMPT.lite.md` + `AUTOPILOT_PROMPT_RELATIVE` switch protocol in `PROMPT.md` prompt-economy section | Phase 10 (#15) | ✅ covered |
 | 43 | Relay-autopilot vs project-autopilot confusion | `relay/SETUP.md` "Relay autopilot vs project autopilot" isolation note | Phase 9 (#14) | ✅ covered (doc) |
 
+## Round-3 extension — first-time-installer dogfood (rows 44–48)
+
+Rows 44–48 came from running the template end-to-end against a brand-new project (`D:\dogfood-sample`, ko locale, no PRD-detection priors) with the same one-prompt path a real operator would take. PR #17 fixes all five.
+
+| # | Incident pattern | Template safeguard | Source PR | Status |
+|---|---|---|---|---|
+| 44 | F1 — Pwsh OEM-codepage mojibake on Korean filenames in install log (e.g. `12-�ƶ�-���-��å.md`) makes Korean operators think the install corrupted their tree | `apply.ps1` head now forces `[Console]::OutputEncoding = UTF-8` + `$OutputEncoding = UTF-8` | Round-3 (#17) | ✅ covered |
+| 45 | F2 — `strings.json` bleeds to target repo root because Copy-Tree walks the full `locales/<lang>/` tree (locale-root file gets dumped at `<target>/strings.json`) | `Copy-Tree`/`copy_tree` gain an `ExcludeRelative` parameter; locale walk skips `strings.json` (still copied explicitly to `.autopilot/locales/<lang>/`) | Round-3 (#17) | ✅ covered |
+| 46 | F3 — `preflight.{ps1,sh}` aborted manual runs with cryptic "missing mandatory parameters: AutopilotRoot" because the runner-only invocation contract was undocumented | Both preflight scripts default `-AutopilotRoot` / `$1` to `<pwd>/.autopilot` when omitted; runner still passes explicit path | Round-3 (#17) | ✅ covered |
+| 47 | F4 — `git-no-origin` failure surfaced as opaque token; fresh-project operators stalled with no remediation path | Per-problem hint switch in both preflights (covers `git-no-origin`, `gh-not-installed`, `gh-not-authed`, `ai-cli-missing*`, `no-prompt-md`) + new "Make sure a GitHub remote exists" step in `apply.{ps1,sh}` Next-steps with copy-paste `gh repo create` | Round-3 (#17) | ✅ covered |
+| 48 | F5 — `PROMPT.lite.md` placeholders never substituted (Phase 10 regression — apply.{ps1,sh} only rendered `PROMPT.md`); the moment `AUTOPILOT_PROMPT_RELATIVE` flipped to maintenance mode the agent saw literal `{{PROJECT_NAME}}` | Render block in both installers loops over `@('PROMPT.md', 'PROMPT.lite.md')` so any future prompt variant inherits placeholder substitution by default | Round-3 (#17) | ✅ covered |
+
 ## Interpretation
 
-**41 of 43 rows have concrete safeguards** inside the template. The two remaining exceptions:
+**46 of 48 rows have concrete safeguards** inside the template. The two remaining exceptions:
 
 - **Row 7 (MCP EditMode filter):** genuinely project-specific — Unity MCP quirks have no place in an engine-agnostic template. Left as a documented known-issue.
 - **Row 16 (relay token counter):** lives in the relay repo, not here. The template's `relay/SETUP.md` points at the relay as Layer 1 owner; that's where the fix belongs.
