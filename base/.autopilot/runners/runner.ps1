@@ -91,9 +91,31 @@ function Finalize-IterationWorktree {
 }
 
 $ai = if ($env:AUTOPILOT_AI) { $env:AUTOPILOT_AI } else { 'codex' }
+
+# Timeout for a single AI CLI invocation. Default 25 min; clamped to [5, 120].
+$llmTimeoutMin = 25
+if ($env:AUTOPILOT_LLM_TIMEOUT_MIN -match '^\d+$') {
+  $llmTimeoutMin = [int]$env:AUTOPILOT_LLM_TIMEOUT_MIN
+  if ($llmTimeoutMin -lt 5) { $llmTimeoutMin = 5 }
+  if ($llmTimeoutMin -gt 120) { $llmTimeoutMin = 120 }
+}
+
+# Consecutive-stall HALT threshold. After N iters that produced
+# wip-commit-failed-snapshotted, wip-failed-no-snapshot, or preflight-failed
+# in a row, runner writes HALT and stops. Default 5, clamp >= 2.
+$stallHaltThreshold = 5
+if ($env:AUTOPILOT_STALL_HALT_THRESHOLD -match '^\d+$') {
+  $stallHaltThreshold = [int]$env:AUTOPILOT_STALL_HALT_THRESHOLD
+  if ($stallHaltThreshold -lt 2) { $stallHaltThreshold = 2 }
+}
+
+$consecutiveStalls = 0
+
 Write-Host "[autopilot] AI = $ai"
 Write-Host "[autopilot] worktree base = $(Get-WorktreeBase)"
 Write-Host "[autopilot] prompt = $promptRelative"
+Write-Host "[autopilot] LLM timeout = ${llmTimeoutMin} min"
+Write-Host "[autopilot] consecutive-stall HALT threshold = $stallHaltThreshold"
 Write-RunnerState -Phase 'startup' -Note '러너를 시작했습니다.'
 
 while ($true) {
@@ -106,55 +128,117 @@ while ($true) {
   $iterStart = Get-Date
   $runRoot = $null
   $aiExitCode = 0
+  $llmTimedOut = $false
+  $preflightFailed = $false
   Write-Host "[autopilot] iteration start $($iterStart.ToString('o'))"
 
-  try {
-    $runRoot = New-IterationWorktree
-    $prompt = Join-Path $runRoot $promptRelative
-    if (-not (Test-Path $prompt)) {
-      throw "Missing $prompt"
+  # --- Preflight: gh auth + AI CLI + git origin ---------------------------
+  $autopilotRoot = Split-Path -Parent $PSScriptRoot
+  $preflightScript = Join-Path $PSScriptRoot 'preflight.ps1'
+  if (Test-Path $preflightScript) {
+    $pfOutput = & $preflightScript -AutopilotRoot $autopilotRoot -Ai $ai 2>&1
+    $pfFinal = ($pfOutput | Select-Object -Last 1).ToString().Trim()
+    Write-Host "[autopilot] preflight: $pfFinal"
+    if ($pfFinal -notmatch '^preflight-ok$') {
+      $preflightFailed = $true
+      $aiExitCode = 2
+      Write-RunnerState -Phase 'preflight-failed' -Note "환경 점검 실패: $pfFinal" -LastExitCode 2
     }
+  }
 
-    Write-RunnerState -Phase 'running' -RunRoot $runRoot -Note '새 자동 전용 작업 폴더에서 한 번 실행 중입니다.'
+  if (-not $preflightFailed) {
+    try {
+      $runRoot = New-IterationWorktree
+      $prompt = Join-Path $runRoot $promptRelative
+      if (-not (Test-Path $prompt)) {
+        throw "Missing $prompt"
+      }
 
-    switch ($ai) {
-      'codex' {
-        $extraArgs = @()
-        if ($env:AUTOPILOT_CODEX_ARGS) {
-          $parseErrors = $null
-          $extraArgs = [System.Management.Automation.PSParser]::Tokenize($env:AUTOPILOT_CODEX_ARGS, [ref]$parseErrors) |
-            Where-Object { $_.Type -in 'CommandArgument', 'String' } |
-            ForEach-Object { $_.Content }
+      Write-RunnerState -Phase 'running' -RunRoot $runRoot -Note '새 자동 전용 작업 폴더에서 한 번 실행 중입니다.'
+
+      # --- AI CLI call with hard timeout ----------------------------------
+      $promptText = Get-Content -Raw $prompt
+      $deadline = (Get-Date).AddMinutes($llmTimeoutMin)
+
+      $job = Start-Job -ArgumentList $ai, $runRoot, $promptText, $env:AUTOPILOT_CODEX_ARGS, $env:AUTOPILOT_CMD -ScriptBlock {
+        param($ai, $runRoot, $promptText, $codexArgsEnv, $customCmd)
+        switch ($ai) {
+          'codex' {
+            $extraArgs = @()
+            if ($codexArgsEnv) {
+              $parseErrors = $null
+              $extraArgs = [System.Management.Automation.PSParser]::Tokenize($codexArgsEnv, [ref]$parseErrors) |
+                Where-Object { $_.Type -in 'CommandArgument', 'String' } |
+                ForEach-Object { $_.Content }
+            }
+            $codexArgs = @('exec', '-C', $runRoot, '--dangerously-bypass-approvals-and-sandbox', '-') + $extraArgs
+            $promptText | codex @codexArgs
+            exit $LASTEXITCODE
+          }
+          'claude' {
+            $promptText | claude --print
+            exit $LASTEXITCODE
+          }
+          'custom' {
+            $env:AUTOPILOT_PROMPT_TEXT = $promptText
+            Push-Location $runRoot
+            try {
+              Invoke-Expression $customCmd
+              exit $LASTEXITCODE
+            } finally { Pop-Location }
+          }
+          default { exit 2 }
         }
-        $codexArgs = @('exec', '-C', $runRoot, '--dangerously-bypass-approvals-and-sandbox', '-') + $extraArgs
-        Get-Content -Raw $prompt | codex @codexArgs
-        $aiExitCode = $LASTEXITCODE
       }
-      'claude' {
-        Get-Content -Raw $prompt | claude --print
-        $aiExitCode = $LASTEXITCODE
-      }
-      'custom' {
-        $env:AUTOPILOT_PROMPT_FILE = $prompt
-        Push-Location $runRoot
+
+      $finished = Wait-Job -Job $job -Timeout ($llmTimeoutMin * 60)
+      if (-not $finished) {
+        Write-Warning "[autopilot] AI call exceeded ${llmTimeoutMin} min — killing."
+        Stop-Job -Job $job -ErrorAction SilentlyContinue
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
+        $llmTimedOut = $true
+        $aiExitCode = 124
         try {
-          Invoke-Expression $env:AUTOPILOT_CMD
-          $aiExitCode = $LASTEXITCODE
-        } finally {
-          Pop-Location
-        }
+          $failuresPath = Join-Path $autopilotRoot 'FAILURES.jsonl'
+          @{ ts=(Get-Date).ToString('o'); event='llm-timeout'; ai=$ai; timeout_min=$llmTimeoutMin } |
+            ConvertTo-Json -Compress | Add-Content -Path $failuresPath -Encoding utf8
+        } catch { }
+      } else {
+        Receive-Job -Job $job -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
+        $aiExitCode = if ($job.ChildJobs[0].JobStateInfo.State -eq 'Completed') { 0 } else { 1 }
+        Remove-Job -Job $job -Force -ErrorAction SilentlyContinue
       }
-      default {
-        throw "Unknown AUTOPILOT_AI=$ai"
-      }
+    } catch {
+      $aiExitCode = 1
+      Write-Warning "[autopilot] AI call failed: $_"
+      Write-RunnerState -Phase 'error' -RunRoot $runRoot -Note "$_" -LastExitCode $aiExitCode
     }
-  } catch {
-    $aiExitCode = 1
-    Write-Warning "[autopilot] AI call failed: $_"
-    Write-RunnerState -Phase 'error' -RunRoot $runRoot -Note "$_" -LastExitCode $aiExitCode
   }
 
   $finalState = if ($runRoot) { Finalize-IterationWorktree -RunRoot $runRoot } else { 'no-worktree' }
+
+  # Stalled-fallback: iter left worktree dirty. Snapshot files, try WIP commit
+  # + push + draft PR so the work is not lost and the operator sees the stall.
+  if ($finalState -eq 'retained-dirty' -and $runRoot) {
+    $fallbackScript = Join-Path $PSScriptRoot 'stalled-fallback.ps1'
+    if (Test-Path $fallbackScript) {
+      try {
+        Write-RunnerState -Phase 'stalled-fallback' -RunRoot $runRoot -Note '워크트리가 dirty로 남아 자동 WIP 구조를 시도합니다.'
+        $fallbackRoot = Split-Path -Parent $PSScriptRoot
+        $fallbackResult = & $fallbackScript -RunRoot $runRoot -AutopilotRoot $fallbackRoot -Iter 0 2>&1
+        $fallbackFinal = ($fallbackResult | Select-Object -Last 1).ToString().Trim()
+        Write-Host "[autopilot] stalled-fallback result: $fallbackFinal"
+        switch -Regex ($fallbackFinal) {
+          '^wip-rescued$'                     { $finalState = 'wip-rescued' }
+          '^wip-local-only-snapshotted$'      { $finalState = 'wip-local-only-snapshotted' }
+          '^wip-commit-failed-snapshotted$'   { $finalState = 'wip-commit-failed-snapshotted' }
+          '^wip-failed-no-snapshot$'          { $finalState = 'wip-failed-no-snapshot' }
+        }
+      } catch {
+        Write-Warning "[autopilot] stalled-fallback error: $_"
+      }
+    }
+  }
 
   # DAD dispatch: drain any tasks the autopilot queued during its turn. See
   # .autopilot/dispatch/README.md for the protocol.
@@ -182,6 +266,29 @@ while ($true) {
   $sleepPhase = 'sleeping'
   $sleepNote = ''
 
+  # Consecutive-stall tracking: preflight-failed, llm-timeout, and unrecoverable
+  # wip-* outcomes count as stalls. removed-clean or wip-rescued reset the count.
+  $isStall = $preflightFailed -or $llmTimedOut -or
+             $finalState -in @('wip-commit-failed-snapshotted', 'wip-failed-no-snapshot')
+  if ($isStall) {
+    $consecutiveStalls++
+    Write-Host "[autopilot] consecutive stalls: $consecutiveStalls / $stallHaltThreshold"
+    if ($consecutiveStalls -ge $stallHaltThreshold) {
+      $haltReason = "연속 $consecutiveStalls 회 stall 로 runner 자동 HALT. 최근: $finalState. 원인 확인 후 .autopilot/HALT 파일을 삭제하고 재시작."
+      Set-Content -Path $halt -Value $haltReason -Encoding utf8
+      Write-Host "[autopilot] $haltReason"
+      try {
+        $failuresPath = Join-Path $autopilotRoot 'FAILURES.jsonl'
+        @{ ts=(Get-Date).ToString('o'); event='consecutive-stall-halt'; consecutive=$consecutiveStalls; threshold=$stallHaltThreshold; final_state=$finalState } |
+          ConvertTo-Json -Compress | Add-Content -Path $failuresPath -Encoding utf8
+      } catch { }
+      Write-RunnerState -Phase 'halted' -Note $haltReason -LastExitCode $aiExitCode
+      break
+    }
+  } else {
+    $consecutiveStalls = 0
+  }
+
   switch ($finalState) {
     'removed-clean' {
       $sleepPhase = 'sleeping'
@@ -191,10 +298,34 @@ while ($true) {
       $sleepPhase = 'retained-dirty'
       $sleepNote = '마지막 실행 결과가 남아 있어 자동 전용 작업 폴더를 보존했습니다. 사용자 작업 폴더는 건드리지 않습니다.'
     }
+    'wip-rescued' {
+      $sleepPhase = 'wip-rescued'
+      $sleepNote = 'iter가 dirty로 끝나서 runner가 자동 WIP commit + draft PR을 만들어 변경을 구조했습니다.'
+    }
+    'wip-local-only-snapshotted' {
+      $sleepPhase = 'wip-local-only'
+      $sleepNote = 'WIP commit은 만들었지만 push 또는 PR 생성이 실패했습니다. .autopilot/stalled/ 스냅샷을 확인하세요.'
+    }
+    'wip-commit-failed-snapshotted' {
+      $sleepPhase = 'wip-commit-failed'
+      $sleepNote = '자동 WIP commit이 pre-commit 훅 등에서 실패했지만 스냅샷은 .autopilot/stalled/에 저장됐습니다.'
+    }
+    'wip-failed-no-snapshot' {
+      $sleepPhase = 'wip-failed'
+      $sleepNote = '자동 WIP 구조가 전부 실패했습니다. .autopilot/FAILURES.jsonl을 확인하세요.'
+    }
     default {
       $sleepPhase = 'sleeping'
       $sleepNote = "작업 폴더 정리 상태: $finalState"
     }
+  }
+
+  if ($preflightFailed) {
+    $sleepPhase = 'preflight-failed'
+    $sleepNote = '환경 점검(preflight) 실패로 이번 iter를 건너뜁니다. gh auth / codex / claude 상태를 확인하세요.'
+  } elseif ($llmTimedOut) {
+    $sleepPhase = 'llm-timeout'
+    $sleepNote = "AI CLI가 ${llmTimeoutMin}분 안에 끝나지 않아 강제 종료했습니다. 다음 iter가 다시 시도합니다."
   }
 
   $sleepFor = 900
