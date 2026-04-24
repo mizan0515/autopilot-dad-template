@@ -1,12 +1,19 @@
 {
-  "maxCumulativeOutputTokens": 32000,
+  "_notes": [
+    "Caps are a CEILING. Individual tasks cannot override these — split the task instead.",
+    "maxCumulativeOutputTokens / cacheReadRatioFloor rotation triggers MUST use segment-scoped counters (OutputTokensAtLastRotation), NOT lifetime totals. A lifetime counter re-trips on the turn AFTER rotation and produces an infinite rotation loop (see relay/SETUP.md Troubleshooting #1).",
+    "Rotation must clear native session handles for ALL peer roles, not only the active one (C2 contract). See relay/SETUP.md Troubleshooting #2.",
+    "carryForwardMaxBytes mirrors the DIALOGUE-PROTOCOL.md handoff.context cap."
+  ],
+  "maxCumulativeOutputTokens": 30000,
   "cacheReadRatioFloor": 0.25,
   "consecutiveLowCacheTurnsThreshold": 2,
   "maxTurnsPerSession": 12,
-  "maxSessionDuration": "01:00:00",
+  "maxSessionDuration": "00:30:00",
+  "perTurnTimeout": "00:10:00",
   "maxRepairAttempts": 1,
   "fallbackClaudeBudgetUsd": 0.25,
-  "perTurnTimeout": "00:20:00",
+  "carryForwardMaxBytes": 2048,
   "jobObject": {
     "userCpuTimePerJob": "01:00:00",
     "activeProcessLimit": 24,

@@ -116,6 +116,18 @@ Debate 절차, 사용자 개입 지점, 자율/감독/하이브리드 모드, Me
 
 ---
 
+## 프로토콜 불변식 (금지 패턴)
+
+아래 패턴들은 downstream relay 에서 사고를 일으킨 적이 있다. validator 는 각각을 hard fail 로 취급한다.
+
+1. **role-conditional 분기 금지.** 코드, 피어 프롬프트, `.prompts/` 파일, 스킬에서 `if agent == "codex"` / `if agent == "claude"` 로 분기해선 안 된다. 프로토콜은 대칭이다. capability 차이 (tool-use 깊이, extended-thinking 예산, streaming) 는 cost-advisor / strategy 패턴으로 주입하지 role-tested conditional 로 하지 않는다. 이 규칙 위반은 `IMMUTABLE:mission` 위반이다.
+2. **`final_no_handoff` 와 `next_task` 동시 존재 금지.** 세션 final 플래그를 세운 턴은 `handoff.next_task` 가 비어있어야 한다. final 에 next_task 가 채워져 있으면 다음 세션이 낡은 state 로 시작하는 migration hazard 가 된다.
+3. **`recovery_resume` 은 명시 증거 필요.** 이전 턴이 중단된 뒤 (operator 재진입, broker crash) resume 하는 턴은 반드시 `confidence: low` 로 표시하고 무엇이 중단됐는지 `open_risks` 항목을 하나 이상 포함한다. `recovery_resume` 로 handoff 나 convergence gate 를 건너뛰려는 시도는 validator reject.
+4. **MCP 호출 correlation 은 세션 audit 로그에 기록되지 않는다.** per-peer JSONL audit 로그는 턴 중간에 어떤 MCP 도구가 호출됐는지 attribute 할 수 없다 (브리지 설계 한계). 턴 패킷은 `evidence.mcp_calls` 에 MCP 호출을 기록하지만, audit 로그 엔트리와 cross-reference 하는 것은 명시적으로 unsupported 다. correlation 을 전제한 validator 규칙을 만들지 말 것.
+5. **METRICS.jsonl 스키마.** Tier-1 필드 (`ts`, `iter`, `outcome` 포함) 는 매 줄 필수. 프로젝트 전용 확장은 relay Tier-3 필드와 충돌을 피하기 위해 `<project>_` prefix 를 붙인다. 배포된 저장소에서는 `tools/Validate-Metrics.ps1` 로 검증.
+
+---
+
 ## 에이전트 정의
 
 Claude Code(대화형, `CLAUDE.md`)와 Codex(배치, `AGENTS.md`)는 별도 에이전트 엔드포인트. 프로토콜은 모델 동일성을 가정하지 않는다. 각자 강점과 한계를 Turn Packet에 드러낸다.
