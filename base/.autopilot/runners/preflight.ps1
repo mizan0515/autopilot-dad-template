@@ -92,7 +92,7 @@ if (-not (Test-Path $promptPath)) {
   $problems.Add('prompt-missing')
 }
 
-# 5. Optional project-specific verify hook (Row 8 slot)
+# 5. Optional project-specific verify hook (Row 8 slot — static config checks)
 $verifyHook = Join-Path $AutopilotRoot 'hooks/preflight-verify.ps1'
 if (Test-Path $verifyHook) {
   try {
@@ -102,6 +102,26 @@ if (Test-Path $verifyHook) {
     }
   } catch {
     $problems.Add("verify-hook-exception:$_")
+  }
+}
+
+# 6. Optional runtime-bridge hook (distinct from verify-hook).
+#    verify-hook asserts static config; runtime-bridge asserts the external
+#    tool actually responds to a 1-call health ping (Unity MCP, Claude Preview,
+#    DB, etc.). "doctor green" is not enough — reachable != responsive.
+#    Failures here are treated as soft: runtime-evidence claims this iter
+#    are not trustworthy, but the iter can still do doc-only work.
+$bridgeHook = Join-Path $AutopilotRoot 'hooks/preflight-runtime-bridge.ps1'
+if (Test-Path $bridgeHook) {
+  try {
+    & $bridgeHook -AutopilotRoot $AutopilotRoot 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+      # Soft warning, not a hard fail — emit a marker the prompt can read.
+      Write-FailureLine @{ event = 'preflight-runtime-bridge'; result = 'unresponsive'; exit = $LASTEXITCODE; ai = $Ai }
+      Write-Host "[preflight] runtime-bridge unresponsive (exit=$LASTEXITCODE) — doc-only iter recommended"
+    }
+  } catch {
+    Write-FailureLine @{ event = 'preflight-runtime-bridge'; result = 'exception'; err = ("$_"); ai = $Ai }
   }
 }
 

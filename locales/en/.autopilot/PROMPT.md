@@ -96,6 +96,56 @@ Right before exiting, in this order:
 
 ---
 
+## Runtime-evidence trust gate
+
+`preflight.{ps1,sh}` runs two hooks separately:
+- `hooks/preflight-verify.{ps1,sh}` — static config check. A failure here aborts the iter (`preflight-failed:verify-hook-failed`).
+- `hooks/preflight-runtime-bridge.{ps1,sh}` — responsive probe for the external tool bridge (Unity MCP, Claude Preview, database, etc.). A failure here is **soft** and recorded in `FAILURES.jsonl` as `event=preflight-runtime-bridge, result=unresponsive`.
+
+If the runtime-bridge probe was unresponsive this iter:
+- Do not claim runtime evidence (screenshots, play-mode QA, live DB output) in commit messages or PR bodies.
+- Prefer doc-only work, spec sync, or backlog grooming for this iter.
+- Log the degraded state in `HISTORY.md` as `runtime-bridge: unresponsive` so the operator dashboard can surface it.
+
+`doctor-green != live-runtime-green`. Preflight reachability is necessary but not sufficient. Also assert the bridge's reported project path equals the current iter worktree — a long-lived MCP process can still be pinned to a previous worktree.
+
+---
+
+## Test filter zero-match guard
+
+Any verification step that runs a focused test filter (`dotnet test --filter`, `pytest -k`, `jest --testNamePattern`, etc.) MUST assert both:
+1. The runner reported a `matched_count > 0`.
+2. The set actually executed equals the set requested.
+
+A green exit on an empty filter is a common silent failure — a typo reads as all-green. Fail the iter and log `test-filter-zero` in METRICS if the filter matched 0.
+
+---
+
+## Budget self-calibration
+
+If `budget_exceeded` fires on >25 % of recent iters, the soft caps no longer carry signal. After iter 20, an idle-upkeep turn may recalibrate the mutable `files_read` / `bash_calls` soft caps to the observed p75 from `METRICS.jsonl` (rounded to a sensible number). Log `budget_recalibrated: {files_read: N, bash_calls: M}` in METRICS. Keep `budget_exceeded` reserved for the loud signal it was designed to be. IMMUTABLE budget entries may NOT be changed this way — those require self-evolution with operator approval.
+
+---
+
+## Incident → backlog admission
+
+When an iter observes a class of failure worth preventing recurring, the next BACKLOG entry gets tagged `[incident]`, `[pitfall]`, or `[retrospective]`:
+- `[incident]` — a concrete production failure (survivor branch, data-loss, broken PR)
+- `[pitfall]` — a near-miss or friction that will bite again (encoding drift, process-launch quirk)
+- `[retrospective]` — operator-initiated review, not tied to a specific failure
+
+Idle-upkeep and brainstorm passes MUST prioritize these tags over generic `[ux]` / `[content]` / `[dx]` items. Append the evidence pointer (`INCIDENTS.md#section` or `PITFALLS.md#entry`) in the backlog line.
+
+---
+
+## Shell / write discipline
+
+- Use `base/tools/Start-Process-Safe.ps1` (or its `.sh` peer) for any subprocess launch that might cross a spaced path. Raw `Start-Process -ArgumentList @('-x','C:\Path With Space')` silently truncates.
+- Use `base/tools/Write-Utf8NoBom.ps1` / `.sh` for any machine-read JSON / JSONL (METRICS, qa-evidence, RUNNER-LIVE, dispatch reports). PowerShell's default `Out-File` writes UTF-16-LE with BOM and has already corrupted non-ASCII content in other projects. Agent-facing `.md` files keep their UTF-8 BOM per the validator contract.
+- Never use broad `replace_all` or `sed -i` on files containing localized copy. Line-targeted edits with surrounding context only.
+
+---
+
 ## Idle upkeep
 
 When no Active task exists and the top of BACKLOG is empty, convert this iter into an upkeep turn:

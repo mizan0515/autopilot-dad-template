@@ -69,10 +69,21 @@ if [ ! -f "$AUTOPILOT_ROOT/PROMPT.md" ]; then
   problems+=("prompt-missing")
 fi
 
-# 5. Optional project-specific verify hook (Row 8 slot)
+# 5. Optional project-specific verify hook (Row 8 slot — static config)
 if [ -x "$AUTOPILOT_ROOT/hooks/preflight-verify.sh" ]; then
   if ! "$AUTOPILOT_ROOT/hooks/preflight-verify.sh" "$AUTOPILOT_ROOT"; then
     problems+=("verify-hook-failed")
+  fi
+fi
+
+# 6. Optional runtime-bridge hook — responsive probe for external tools
+#    (Unity MCP, Claude Preview, DB, etc.). Soft-fail only: doctor-green
+#    does not mean responsive. A failure here does not abort the iter but
+#    is logged so the loop can mark runtime-evidence as untrustworthy.
+if [ -x "$AUTOPILOT_ROOT/hooks/preflight-runtime-bridge.sh" ]; then
+  if ! "$AUTOPILOT_ROOT/hooks/preflight-runtime-bridge.sh" "$AUTOPILOT_ROOT"; then
+    write_failure "event=preflight-runtime-bridge" "result=unresponsive" "ai=$AI"
+    echo "[preflight] runtime-bridge unresponsive — doc-only iter recommended" >&2
   fi
 fi
 
