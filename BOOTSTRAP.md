@@ -58,6 +58,8 @@ codex --version      # Codex desktop CLI
 
 If neither exists, STOP and explain: "Install Claude Code desktop from https://claude.com/claude-code or Codex desktop from https://chatgpt.com/codex, then re-paste this prompt."
 
+For first-time login detail (desktop vs CLI-only, OAuth flow, corporate-proxy edge cases), point the operator at `docs/cli-login-guide.md` (copied into the target project by `apply` from `locales/<lang>/docs/`).
+
 ### Step 3 — Git repo init if needed
 
 ```

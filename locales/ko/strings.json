@@ -27,7 +27,8 @@
     "empty_dad": "아직 저장된 로봇 대화가 없습니다.",
     "empty_timeline": "표시할 최근 작업이 없습니다.",
     "empty_prs": "지금 열려 있는 자동 PR은 없습니다.",
-    "empty_manager_actions": "지금은 관리자님이 따로 할 일이 없습니다."
+    "empty_manager_actions": "지금은 관리자님이 따로 할 일이 없습니다.",
+    "pr_lang_mismatch": "⚠ 제목 언어 불일치"
   },
   "status_labels": {
     "converged": "✅ 대화 끝남",
