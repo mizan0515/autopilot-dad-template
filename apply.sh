@@ -131,9 +131,18 @@ conflict_count=0
 
 copy_tree() {
   local src="$1"
+  local exclude="${2:-}"  # comma-separated list of relative paths to skip
   if [ ! -d "$src" ]; then return; fi
   ( cd "$src" && find . -type f -print0 ) | while IFS= read -r -d '' rel; do
     rel="${rel#./}"
+    if [ -n "$exclude" ]; then
+      case ",$exclude," in
+        *",$rel,"*)
+          echo "[apply] skip (locale-root, copied separately): $rel"
+          continue
+          ;;
+      esac
+    fi
     local dst="$TARGET/$rel"
     if [ -e "$dst" ]; then
       if ! cmp -s "$src/$rel" "$dst"; then
@@ -151,7 +160,9 @@ copy_tree() {
 }
 
 copy_tree "$TPL_BASE"
-copy_tree "$TPL_LOC"
+# Skip locale-root strings.json — copied explicitly to .autopilot/locales/ below
+# (round-3 dogfood F2: was bleeding to target repo root).
+copy_tree "$TPL_LOC" "strings.json"
 
 # --- config.json ----------------------------------------------------------
 CFG="$TARGET/.autopilot/config.json"
@@ -179,10 +190,13 @@ PY
   echo "[apply] wrote $CFG"
 fi
 
-# --- render PROMPT.md placeholders ----------------------------------------
-PROMPT_PATH="$TARGET/.autopilot/PROMPT.md"
-if [ -f "$PROMPT_PATH" ]; then
-  python3 - "$PROMPT_PATH" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" <<'PY'
+# --- render PROMPT.md + PROMPT.lite.md placeholders -----------------------
+# Both share placeholders; skipping the lite one leaks literal {{...}} the
+# moment AUTOPILOT_PROMPT_RELATIVE switches to maintenance mode (round-3 F5).
+for pn in PROMPT.md PROMPT.lite.md; do
+  PROMPT_PATH="$TARGET/.autopilot/$pn"
+  if [ -f "$PROMPT_PATH" ]; then
+    python3 - "$PROMPT_PATH" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" <<'PY'
 import sys, pathlib
 path, name, desc, directive, lang = sys.argv[1:]
 p = pathlib.Path(path)
@@ -193,8 +207,9 @@ t = t.replace('{{PRODUCT_DIRECTIVE}}', directive)
 t = t.replace('{{OPERATOR_LANGUAGE}}', lang)
 p.write_text(t, encoding='utf-8')
 PY
-  echo "[apply] rendered placeholders in .autopilot/PROMPT.md"
-fi
+    echo "[apply] rendered placeholders in .autopilot/$pn"
+  fi
+done
 
 # --- render top-level agent MDs (UTF-8 with BOM) --------------------------
 for md in PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md; do
@@ -281,7 +296,12 @@ Next steps:
   1. Review .autopilot/config.json and .autopilot/BACKLOG.md (replace seed tasks).
   2. Review PROJECT-RULES.md / CLAUDE.md / AGENTS.md at repo root and fill in project-specific guardrails.
   3. git add .autopilot .githooks .github tools .claude .agents .prompts relay PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
-  4. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
-  5. (Optional) To enable MCP pass-through + centralized token budget, see relay/SETUP.md.
+  4. Make sure a GitHub remote exists (preflight will fail with 'git-no-origin' otherwise):
+       gh repo create <owner>/<name> --source=. --remote=origin --private --push
+     or if the repo already exists on GitHub:
+       git remote add origin https://github.com/<owner>/<name>.git
+       git push -u origin main
+  5. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
+  6. (Optional) To enable MCP pass-through + centralized token budget, see relay/SETUP.md.
      Without a relay, DAD still works in user-bridged mode (copy/paste peer prompts).
 HINT

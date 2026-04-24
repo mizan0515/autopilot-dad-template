@@ -18,11 +18,28 @@
 #   preflight-failed:<reason>
 
 param(
-  [Parameter(Mandatory)][string]$AutopilotRoot,
+  [string]$AutopilotRoot = '',
   [string]$Ai = 'codex'
 )
 
 $ErrorActionPreference = 'Continue'
+
+# Default AutopilotRoot: when an operator runs preflight directly from the
+# project root (`pwsh .autopilot/runners/preflight.ps1`) the runner's auto-
+# resolve isn't there, and a Mandatory param made it abort with a cryptic
+# "missing mandatory parameters: AutopilotRoot" error (round-3 dogfood F3).
+# Resolve to <pwd>/.autopilot when omitted; runner.{ps1,sh} still passes
+# explicitly.
+if (-not $AutopilotRoot) {
+  $candidate = Join-Path (Get-Location).Path '.autopilot'
+  if (Test-Path $candidate) {
+    $AutopilotRoot = $candidate
+  } else {
+    Write-Error "[preflight] -AutopilotRoot not given and .\.autopilot not found from $(Get-Location)."
+    exit 1
+  }
+}
+
 $failuresPath = Join-Path $AutopilotRoot 'FAILURES.jsonl'
 
 function Write-FailureLine {
@@ -128,6 +145,22 @@ if (Test-Path $bridgeHook) {
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"
+  # Friendly hints for the most common bootstrap-time failures (round-3 F4).
+  # Without these, a fresh-project operator sees an opaque token and stalls.
+  foreach ($p in $problems) {
+    switch -Wildcard ($p) {
+      'git-no-origin' {
+        Write-Host "  hint: this project has no GitHub remote yet. Create one with:" -ForegroundColor Yellow
+        Write-Host "    gh repo create <owner>/<name> --source=. --remote=origin --private --push" -ForegroundColor Yellow
+        Write-Host "  or, if the repo already exists on GitHub:" -ForegroundColor Yellow
+        Write-Host "    git remote add origin https://github.com/<owner>/<name>.git && git push -u origin main" -ForegroundColor Yellow
+      }
+      'gh-not-installed' { Write-Host "  hint: install GitHub CLI from https://cli.github.com/ then run 'gh auth login'." -ForegroundColor Yellow }
+      'gh-not-authed'    { Write-Host "  hint: run 'gh auth login' and choose GitHub.com + HTTPS + browser." -ForegroundColor Yellow }
+      'ai-cli-missing*'  { Write-Host "  hint: see docs/cli-login-guide.md for installing claude/codex CLI." -ForegroundColor Yellow }
+      'no-prompt-md'     { Write-Host "  hint: re-run apply.ps1 — .autopilot/PROMPT.md is missing." -ForegroundColor Yellow }
+    }
+  }
   Write-FailureLine @{ event = 'preflight'; result = 'failed'; reason = $reason; ai = $Ai }
   Write-Output "preflight-failed:$reason"
   exit 1

@@ -26,6 +26,16 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Force UTF-8 console I/O so non-ASCII (Korean/Japanese/Chinese) filenames and
+# operator-facing prompts render correctly in pwsh on Windows. Without this the
+# default OEM/ANSI codepage produces mojibake like '12-�ƶ�-���-��å.md' in the
+# install log, which makes Korean operators think the install was corrupted
+# (round-3 dogfood F1). Files on disk were always fine — only stdout was wrong.
+try {
+  [Console]::OutputEncoding = [Text.UTF8Encoding]::new()
+  $OutputEncoding = [Text.UTF8Encoding]::new()
+} catch {}
+
 $TemplateUrl = if ($env:AUTOPILOT_TEMPLATE_URL) { $env:AUTOPILOT_TEMPLATE_URL } else { 'https://github.com/mizan0515/autopilot-dad-template.git' }
 $Target = (Get-Location).Path
 $Conflicts = Join-Path $Target '.apply-conflicts'
@@ -130,10 +140,19 @@ try {
   $conflictCount = 0
 
   function Copy-Tree {
-    param([string]$Src)
+    param(
+      [string]$Src,
+      [string[]]$ExcludeRelative = @()
+    )
     if (-not (Test-Path $Src)) { return }
     Get-ChildItem -Path $Src -Recurse -File | ForEach-Object {
       $rel = $_.FullName.Substring($Src.Length + 1)
+      # Normalize to forward slashes for cross-platform exclude matching.
+      $relNorm = $rel -replace '\\','/'
+      if ($ExcludeRelative -contains $relNorm) {
+        Write-Host "[apply] skip (locale-root, copied separately): $rel"
+        return
+      }
       $dst = Join-Path $Target $rel
       $dstDir = Split-Path $dst -Parent
       if (Test-Path $dst) {
@@ -155,7 +174,10 @@ try {
   }
 
   Copy-Tree -Src $tplBase
-  Copy-Tree -Src $tplLoc
+  # Locale tree: skip the locale-root strings.json — it is copied explicitly to
+  # .autopilot/locales/<lang>/strings.json below. Without this exclude it bleeds
+  # to the target repo root (round-3 dogfood F2).
+  Copy-Tree -Src $tplLoc -ExcludeRelative @('strings.json')
 
   # --- config.json ---------------------------------------------------------
   $cfgPath = Join-Path $Target '.autopilot/config.json'
@@ -180,16 +202,22 @@ try {
     Write-Host "[apply] wrote $cfgPath"
   }
 
-  # --- render PROMPT.md placeholders --------------------------------------
-  $promptPath = Join-Path $Target '.autopilot/PROMPT.md'
-  if (Test-Path $promptPath) {
-    $t = Get-Content $promptPath -Raw -Encoding utf8
-    $t = $t.Replace('{{PROJECT_NAME}}', $Name)
-    $t = $t.Replace('{{PROJECT_DESCRIPTION}}', $Description)
-    $t = $t.Replace('{{PRODUCT_DIRECTIVE}}', $Directive)
-    $t = $t.Replace('{{OPERATOR_LANGUAGE}}', $Language)
-    [IO.File]::WriteAllText($promptPath, $t, (New-Object Text.UTF8Encoding $false))
-    Write-Host "[apply] rendered placeholders in .autopilot/PROMPT.md"
+  # --- render PROMPT.md + PROMPT.lite.md placeholders ---------------------
+  # Both prompts share the same {{PROJECT_NAME}} / {{OPERATOR_LANGUAGE}} /
+  # {{PRODUCT_DIRECTIVE}} placeholders. Skipping the lite one leaves literal
+  # {{...}} in the agent context the moment AUTOPILOT_PROMPT_RELATIVE switches
+  # to maintenance mode (round-3 dogfood F5).
+  foreach ($pn in @('PROMPT.md', 'PROMPT.lite.md')) {
+    $promptPath = Join-Path $Target ".autopilot/$pn"
+    if (Test-Path $promptPath) {
+      $t = Get-Content $promptPath -Raw -Encoding utf8
+      $t = $t.Replace('{{PROJECT_NAME}}', $Name)
+      $t = $t.Replace('{{PROJECT_DESCRIPTION}}', $Description)
+      $t = $t.Replace('{{PRODUCT_DIRECTIVE}}', $Directive)
+      $t = $t.Replace('{{OPERATOR_LANGUAGE}}', $Language)
+      [IO.File]::WriteAllText($promptPath, $t, (New-Object Text.UTF8Encoding $false))
+      Write-Host "[apply] rendered placeholders in .autopilot/$pn"
+    }
   }
 
   # --- render top-level agent MDs -----------------------------------------
@@ -271,8 +299,13 @@ Next steps:
   1. Review .autopilot/config.json and .autopilot/BACKLOG.md (replace seed tasks).
   2. Review PROJECT-RULES.md / CLAUDE.md / AGENTS.md at repo root and fill in project-specific guardrails.
   3. git add .autopilot .githooks .github tools .claude .agents .prompts relay PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
-  4. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
-  5. (Optional) To enable MCP pass-through + centralized token budget, see relay/SETUP.md.
+  4. Make sure a GitHub remote exists (preflight will fail with 'git-no-origin' otherwise):
+       gh repo create <owner>/<name> --source=. --remote=origin --private --push
+     or if the repo already exists on GitHub:
+       git remote add origin https://github.com/<owner>/<name>.git
+       git push -u origin main
+  5. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
+  6. (Optional) To enable MCP pass-through + centralized token budget, see relay/SETUP.md.
      Without a relay, DAD still works in user-bridged mode (copy/paste peer prompts).
 "@
 }
