@@ -66,6 +66,18 @@
 
 예외: 기술적 conventional-commit 프리픽스 (`fix:`, `chore:`, `feat:`) 뒤에 운영자 언어 본문이 오는 형태는 허용.
 
+## 확장 추론 · 토큰 예산 · 캐시 회귀
+
+Claude Code 는 필요 판단에 따라 확장 추론(extended thinking) 을 자동으로 사용한다 (별도 env 플래그 없음). 턴 내에서 의식적으로 조절할 것:
+- 설계 결정, 근본 원인 추적, 다중 파일 리팩터, DAD Sprint Contract 초안에서는 깊이를 아끼지 않는다.
+- 반복적 기계 편집에서는 Read → Edit 루틴으로 내려가 토큰을 아낀다.
+- 릴레이 브로커는 `relay/profile-stub/broker.*.json` 의 `maxCumulativeOutputTokens` / `maxTurnsPerSession` 을 세션 단위 상한으로 본다.
+
+`.autopilot/PROMPT.md` IMMUTABLE budget 블록이 우선한다. 추가 운영 규약:
+- 연속 2 iter 동안 캐시 읽기 비율이 0.25 미만이면 즉시 요약 턴으로 전환하고 `.prompts/12-맥락-요약-정책.md` 절차를 따른다.
+- iter 당 파일 읽기 20회 / 셸 호출 30회 soft cap 을 넘으면 `.autopilot/PITFALLS.md` 에 "맥락 폭주" 항목을 추가한다.
+- 이 회귀가 3회 누적되면 `.autopilot/EVOLUTION.md` 에 프롬프트 축소 제안을 적고 자동 루프를 중단한다 (사용자 승인이 있어야 재개).
+
 ---
 
 ## Standalone Stance

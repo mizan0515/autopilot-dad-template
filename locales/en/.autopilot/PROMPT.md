@@ -51,6 +51,10 @@ Never bulk-read DAD session turn-*.yaml files unless the current task directly i
 
 - Soft token cap per iter: 350k
 - Hard wall-clock cap per iter: 30 min
+- Soft file-read cap per iter: 20 reads — on overage, log "context sprawl" in `.autopilot/PITFALLS.md`.
+- Soft shell-call cap per iter: 30 invocations — on overage, collapse into larger single pipelines.
+- If cache-read-ratio stays below 0.25 for 2 consecutive iters, shrink the task immediately and force a summarization turn.
+- The relay broker caps (`maxCumulativeOutputTokens`, `maxTurnsPerSession` in `relay/profile-stub/broker.*.json`) also apply per session.
 - On overage, shrink the task, log reason in `HISTORY.md`, and exit cleanly.
 <!-- IMMUTABLE:budget:END -->
 
