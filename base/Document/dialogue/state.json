@@ -1,0 +1,9 @@
+{
+  "protocol_version": "dad-v2",
+  "session_id": null,
+  "session_status": "none",
+  "active_agent": null,
+  "turn_count": 0,
+  "last_updated": null,
+  "notes": "No active DAD session. Use tools/New-DadSession.ps1 to create one."
+}
