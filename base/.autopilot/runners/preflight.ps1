@@ -9,6 +9,9 @@
 #   - gh CLI installed + authenticated (needed for PR create)
 #   - AI CLI available for AUTOPILOT_AI (codex or claude)
 #   - git command works + origin remote set
+#   - .autopilot/PROMPT.md exists (Row 12: empty-prompt infinite error loop)
+#   - Optional project-specific verify hook at .autopilot/hooks/preflight-verify.ps1
+#     (Row 8 slot — runtime checks like Unity MCP availability)
 #
 # Output: final line is one of:
 #   preflight-ok
@@ -80,6 +83,25 @@ switch ($Ai) {
   }
   default {
     $problems.Add("unknown-ai:$Ai")
+  }
+}
+
+# 4. PROMPT.md exists (Row 12: empty-prompt infinite loop)
+$promptPath = Join-Path $AutopilotRoot 'PROMPT.md'
+if (-not (Test-Path $promptPath)) {
+  $problems.Add('prompt-missing')
+}
+
+# 5. Optional project-specific verify hook (Row 8 slot)
+$verifyHook = Join-Path $AutopilotRoot 'hooks/preflight-verify.ps1'
+if (Test-Path $verifyHook) {
+  try {
+    & $verifyHook -AutopilotRoot $AutopilotRoot 2>&1 | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+      $problems.Add("verify-hook-failed:$LASTEXITCODE")
+    }
+  } catch {
+    $problems.Add("verify-hook-exception:$_")
   }
 }
 

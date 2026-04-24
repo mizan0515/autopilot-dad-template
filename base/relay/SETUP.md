@@ -87,6 +87,23 @@ To disable pass-through for a specific profile, set `profile.json`:
 }
 ```
 
+## Worktree reuse (disk-saturation prevention)
+
+The autopilot runner in this template creates a **single reusable worktree** at
+`<repo-parent>/<leaf>-autopilot-runner/live` (override via `AUTOPILOT_WORKTREE_DIR`)
+rather than a per-iter worktree. This prevents the Row 17 incident where disk
+fills up after hundreds of iters.
+
+If you ever see `<leaf>-autopilot-runner/iter-*` directories accumulating:
+
+```sh
+git worktree prune --expire now
+```
+
+run from the main repo root will detach and clean dead worktrees. Do NOT `rm -rf`
+stale worktrees — always use `git worktree remove` / `git worktree prune` so the
+main repo's `.git/worktrees/` bookkeeping stays consistent.
+
 ## Fallback: user-bridged mode
 
 If you skip relay install, DAD still works:
