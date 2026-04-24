@@ -6,7 +6,7 @@
 set -uo pipefail
 
 AUTOPILOT_ROOT="${1:-}"
-AI="${2:-codex}"
+AI="${2:-}"
 
 # Default to <pwd>/.autopilot when invoked manually from the project root,
 # matching preflight.ps1's behaviour (round-3 dogfood F3).
@@ -17,6 +17,26 @@ if [ -z "$AUTOPILOT_ROOT" ]; then
     echo "usage: preflight.sh <AutopilotRoot> [ai]" >&2
     echo "  (run from project root or pass an explicit path)" >&2
     exit 2
+  fi
+fi
+
+# Default $AI: when operator runs preflight standalone (no runner), the second
+# arg is missing. Round-3 F14: previously defaulted to 'codex' regardless of
+# operator choice in apply, so a Claude operator saw codex preflight checks.
+# Priority: $2 → $AUTOPILOT_AI → config.json.autopilot_ai → 'codex'.
+if [ -z "$AI" ]; then
+  if [ -n "${AUTOPILOT_AI:-}" ]; then
+    AI="$AUTOPILOT_AI"
+  else
+    cfg_path="$AUTOPILOT_ROOT/config.json"
+    if [ -f "$cfg_path" ]; then
+      if command -v jq >/dev/null 2>&1; then
+        AI="$(jq -r '.autopilot_ai // empty' "$cfg_path" 2>/dev/null || true)"
+      else
+        AI="$(sed -n 's/.*"autopilot_ai"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$cfg_path" | head -1)"
+      fi
+    fi
+    [ -z "$AI" ] && AI="codex"
   fi
 fi
 

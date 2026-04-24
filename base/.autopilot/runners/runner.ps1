@@ -90,7 +90,29 @@ function Finalize-IterationWorktree {
   return 'removed-clean'
 }
 
-$ai = if ($env:AUTOPILOT_AI) { $env:AUTOPILOT_AI } else { 'codex' }
+# Resolve the autopilot AI in this priority order:
+#   1. $env:AUTOPILOT_AI  (per-shell override)
+#   2. .autopilot/config.json's `autopilot_ai` (operator's apply choice)
+#   3. 'codex' (template default)
+# Round-3 F14: config.json.autopilot_ai was written by apply.ps1 but never
+# consumed — operators who answered "claude" still got codex preflight +
+# execution unless they also exported AUTOPILOT_AI. That made the apply
+# prompt cosmetic and silently broke the Claude-CLI path.
+$ai = $null
+if ($env:AUTOPILOT_AI) {
+  $ai = $env:AUTOPILOT_AI
+} else {
+  $cfgPath = Join-Path $PSScriptRoot '..\config.json'
+  if (Test-Path $cfgPath) {
+    try {
+      $cfg = Get-Content -LiteralPath $cfgPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+      if ($cfg.autopilot_ai) { $ai = [string]$cfg.autopilot_ai }
+    } catch {
+      Write-Warning "[runner] failed to parse $cfgPath; falling back to codex. ($_)"
+    }
+  }
+  if (-not $ai) { $ai = 'codex' }
+}
 
 # Timeout for a single AI CLI invocation. Default 25 min; clamped to [5, 120].
 $llmTimeoutMin = 25

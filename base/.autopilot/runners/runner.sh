@@ -82,7 +82,28 @@ finalize_iteration_worktree() {
   printf 'removed-clean\n'
 }
 
-AI="${AUTOPILOT_AI:-codex}"
+# Resolve the autopilot AI in this priority order:
+#   1. $AUTOPILOT_AI  (per-shell override)
+#   2. .autopilot/config.json's `autopilot_ai` (operator's apply choice)
+#   3. 'codex' (template default)
+# Round-3 F14: config.json.autopilot_ai was written by apply.{ps1,sh} but
+# never consumed — operators who answered "claude" still got codex
+# preflight + execution unless they also exported AUTOPILOT_AI.
+if [ -n "${AUTOPILOT_AI:-}" ]; then
+  AI="$AUTOPILOT_AI"
+else
+  AI=""
+  cfg_path="$(dirname "$0")/../config.json"
+  if [ -f "$cfg_path" ]; then
+    if command -v jq >/dev/null 2>&1; then
+      AI="$(jq -r '.autopilot_ai // empty' "$cfg_path" 2>/dev/null || true)"
+    else
+      # jq-less fallback: extract "autopilot_ai": "<value>"
+      AI="$(sed -n 's/.*"autopilot_ai"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$cfg_path" | head -1)"
+    fi
+  fi
+  [ -z "$AI" ] && AI="codex"
+fi
 CODEX_CMD="$(resolve_cmd codex || true)"
 CLAUDE_CMD="$(resolve_cmd claude || true)"
 

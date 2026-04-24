@@ -19,7 +19,7 @@
 
 param(
   [string]$AutopilotRoot = '',
-  [string]$Ai = 'codex'
+  [string]$Ai = ''
 )
 
 $ErrorActionPreference = 'Continue'
@@ -37,6 +37,29 @@ if (-not $AutopilotRoot) {
   } else {
     Write-Error "[preflight] -AutopilotRoot not given and .\.autopilot not found from $(Get-Location)."
     exit 1
+  }
+}
+
+# Default $Ai: when operator runs preflight standalone (no runner), -Ai is not
+# passed. Round-3 F14: previously defaulted to 'codex' regardless of operator
+# choice in apply, so a Claude operator would see preflight check codex CLI.
+# Resolve in this priority order:
+#   1. -Ai param  (runner passes this explicitly)
+#   2. $env:AUTOPILOT_AI
+#   3. config.json's `autopilot_ai`
+#   4. 'codex' (template default)
+if (-not $Ai) {
+  if ($env:AUTOPILOT_AI) {
+    $Ai = $env:AUTOPILOT_AI
+  } else {
+    $cfgPath = Join-Path $AutopilotRoot 'config.json'
+    if (Test-Path $cfgPath) {
+      try {
+        $cfg = Get-Content -LiteralPath $cfgPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if ($cfg.autopilot_ai) { $Ai = [string]$cfg.autopilot_ai }
+      } catch { }
+    }
+    if (-not $Ai) { $Ai = 'codex' }
   }
 }
 
