@@ -1,0 +1,26 @@
+name: Validate DAD Packets
+
+on:
+  pull_request:
+    paths:
+      - 'Document/dialogue/**'
+      - 'tools/Validate-DadPacket.ps1'
+      - '.github/workflows/validate-dad-packets.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Document/dialogue/**'
+      - 'tools/Validate-DadPacket.ps1'
+      - '.github/workflows/validate-dad-packets.yml'
+
+jobs:
+  validate-packets:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate DAD Packets and State
+        shell: pwsh
+        run: ./tools/Validate-DadPacket.ps1 -Root . -AllSessions

@@ -1,0 +1,24 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+cd "$repo_root"
+
+if command -v pwsh >/dev/null 2>&1; then
+  runner="pwsh"
+elif command -v powershell >/dev/null 2>&1; then
+  runner="powershell"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  runner="powershell.exe"
+else
+  echo "PowerShell not found. Install pwsh 7.2+ or ensure powershell(.exe) is on PATH before using .githooks/pre-commit." >&2
+  exit 1
+fi
+
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-Documents.ps1 -Root . -IncludeRootGuides -IncludeAgentDocs -ReportLargeRootGuides -FailOnLargeDocs
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-CodexSkillMetadata.ps1 -RepoRoot .
+"$runner" -ExecutionPolicy Bypass -File tools/Register-CodexSkills.ps1 -RepoRoot . -SkillHome "$repo_root/.git/.codex-hook-validate" -ValidateOnly
+"$runner" -ExecutionPolicy Bypass -File tools/Lint-StaleTerms.ps1
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisions.ps1 -Root .
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisionWorkflow.ps1 -Root .
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadPacket.ps1 -Root . -AllSessions
