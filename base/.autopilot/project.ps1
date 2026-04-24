@@ -122,6 +122,21 @@ function Get-OpenPrs {
   } catch { return @() }
 }
 
+function Test-PrTitleLangMismatch {
+  param([string]$Title, [string]$OperatorLang)
+  if (-not $Title -or -not $OperatorLang) { return $false }
+  $primary = ($OperatorLang -split '[-_]')[0].ToLowerInvariant()
+  # CJK operators: warn when title has zero CJK characters (conventional-commit
+  # prefix alone is allowed — we look at the body after the first colon).
+  if ($primary -in 'ko','ja','zh') {
+    $body = $Title
+    if ($Title -match '^[a-z]+(\([^)]+\))?:\s*(.+)$') { $body = $Matches[2] }
+    $hasCjk = ($body -match '[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]')
+    return -not $hasCjk
+  }
+  return $false
+}
+
 function ConvertTo-JsonCompact($obj) {
   return ($obj | ConvertTo-Json -Depth 12 -Compress)
 }
@@ -174,6 +189,7 @@ function Invoke-Status {
       url = $p.url
       branch = $p.headRefName
       draft = $p.isDraft
+      lang_mismatch = (Test-PrTitleLangMismatch -Title $p.title -OperatorLang $lang)
     }
   }
 

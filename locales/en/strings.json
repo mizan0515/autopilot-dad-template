@@ -27,7 +27,8 @@
     "empty_dad": "No saved robot conversations yet.",
     "empty_timeline": "No recent activity to show.",
     "empty_prs": "No open auto-PRs right now.",
-    "empty_manager_actions": "Nothing for the operator to do right now."
+    "empty_manager_actions": "Nothing for the operator to do right now.",
+    "pr_lang_mismatch": "⚠ title language mismatch"
   },
   "status_labels": {
     "converged": "✅ Talk ended",

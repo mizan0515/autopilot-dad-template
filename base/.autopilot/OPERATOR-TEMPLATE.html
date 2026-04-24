@@ -80,15 +80,20 @@
 
     function renderPrs(items) {
       if (!items || !items.length) return `<div class="empty">${esc(d.empty_prs)}</div>`;
-      return items.map(i => `
+      return items.map(i => {
+        const flags = [];
+        if (i.draft) flags.push('draft');
+        if (i.lang_mismatch) flags.push(esc(d.pr_lang_mismatch || 'title language mismatch'));
+        return `
         <article class="story-card">
           <div class="story-top">
             <span class="story-badge">PR #${esc(i.number)}</span>
-            <span>${i.draft ? 'draft' : ''}</span>
+            <span>${flags.join(' · ')}</span>
           </div>
           <h3><a href="${esc(i.url)}">${esc(i.title)}</a></h3>
           <p class="muted">${esc(i.branch)}</p>
-        </article>`).join('');
+        </article>`;
+      }).join('');
     }
 
     function renderGlossary(items) {
