@@ -1,62 +1,83 @@
 # autopilot-dad-template
 
-자율 오토파일럿 + DAD(Dual-Agent Dialogue) 피어 협업 시스템 템플릿.
-한 번의 프롬프트로 임의의 Git 프로젝트에 적용할 수 있도록 설계됨.
+Autonomous autopilot + DAD (Dual-Agent Dialogue) peer-collaboration template.
+One prompt applies a full autopilot loop to any Git project. i18n: operator language
+chosen at apply time, so dashboards, status lines, and glossary render in that language.
 
 ---
 
-## Claude Code/Codex에게 주는 지시 (원-프롬프트 부트스트랩)
+## One-prompt bootstrap (Claude Code / Codex)
 
-> 이 저장소의 템플릿을 현재 프로젝트에 적용해줘.
-> 아래 순서를 정확히 따를 것:
+> Apply the template at `https://github.com/mizan0515/autopilot-dad-template` to the current project.
 >
-> 1. 이 저장소(`https://github.com/mizan0515/autopilot-dad-template`)의 `apply.ps1`(Windows) 또는 `apply.sh`(macOS/Linux)를 현재 프로젝트 루트에서 실행한다.
->    - 이미 `.autopilot/` 폴더가 있으면 **덮어쓰지 말고** 차이만 추가 제안한다.
->    - 누락된 파일만 채워 넣고, 변경된 파일은 `.apply-conflicts/` 로 따로 저장한다.
-> 2. 프로젝트 루트의 `.autopilot/PROMPT.md` 를 열어, 상단의 `<<PROJECT_NAME>>`, `<<PROJECT_DESCRIPTION>>`, `<<PRODUCT_DIRECTIVE>>` 플레이스홀더를 실제 값으로 채운다.
-> 3. `.autopilot/BACKLOG.md` 의 시드 항목을 프로젝트 실제 첫 과제 1~3개로 교체한다.
-> 4. `.autopilot/hooks/` 를 `git config core.hooksPath .autopilot/hooks` 로 등록한다.
-> 5. 첫 iter는 **수동으로** Claude Code 데스크톱 앱에 `.autopilot/RUN.claude-code.md` 전체를 복붙해 실행한다. 자동 반복은 `ScheduleWakeup` 도구로 스스로 다음 턴을 예약한다.
-> 6. Codex 데스크톱만 있다면 `.autopilot/RUN.codex-desktop.md` 전체를 복붙(반복 큐잉)한다.
-> 7. 적용 후 `git status` 로 변경을 확인하고 `docs/autopilot-bootstrap.md` 에 현재 프로젝트의 `PROJECT_NAME`, `PRODUCT_DIRECTIVE` 를 기록한다.
-> 8. **중단 조건**: 충돌이 5개 이상이면 자동 적용을 멈추고 운영자에게 보고한다.
+> Dialogue flow:
+> 1. **Agent asks**: "What operator language? (en, ko, ja, zh-CN, es, fr, de, or any BCP-47 tag — default en)"
+> 2. **Operator answers**: e.g. "English" / "한국어" / "ja".
+> 3. **Agent runs** `apply.ps1 -Language <tag>` (Windows) or `./apply.sh --language <tag>` (macOS/Linux) from the project root, answering the project-name/description/directive prompts from context if known, otherwise asking.
+> 4. Installer writes `.autopilot/config.json`, copies `base/` + `locales/<lang>/` into `.autopilot/`, renders placeholders in `PROMPT.md`, and registers hooks via `git config core.hooksPath .autopilot/hooks`.
+> 5. If `<lang>` is not shipped, English templates are copied but `operator_language` in config is set to `<lang>` so the agent still renders runtime text in that language.
+> 6. Any existing `.autopilot/*` files are preserved; differing incoming files land in `.apply-conflicts/`. **Abort** if conflicts ≥ 5.
+> 7. Agent replaces the seed items in `.autopilot/BACKLOG.md` with the project's real first 1–3 tasks.
+> 8. First iter: paste `.autopilot/RUN.claude-code.md` into Claude Code desktop (or `RUN.codex-desktop.md` into Codex). The runner self-schedules via `ScheduleWakeup`.
 
-상대방이 이 리포지토리의 URL과 위 지시만 받으면 프로젝트 종류(Unity/웹/CLI/라이브러리 등)와 무관하게 동일 오토파일럿 루프가 동작해야 한다.
+The same prompt works regardless of project type (Unity / web / CLI / library).
 
 ---
 
-## 포함된 것
+## What's inside
+
+```
+autopilot-dad-template/
+├── apply.ps1                 # Windows installer (language-aware)
+├── apply.sh                  # Unix installer (language-aware)
+├── base/
+│   └── .autopilot/
+│       ├── project.ps1              # status / dashboard / lifecycle verbs
+│       ├── OPERATOR-TEMPLATE.html   # i18n HTML shell (reads strings.json)
+│       ├── config.schema.json       # JSON Schema for .autopilot/config.json
+│       ├── runners/{runner.ps1, runner.sh}
+│       ├── hooks/{pre-commit, protect.sh, protect.ps1, commit-msg*}
+│       ├── NEXT_DELAY, METRICS.jsonl
+└── locales/
+    ├── en/
+    │   ├── .autopilot/{PROMPT, RUN.claude-code, RUN.codex-desktop,
+    │   │               STATE, BACKLOG, HISTORY, PITFALLS, EVOLUTION}.md
+    │   └── strings.json             # dashboard + runner + glossary strings
+    └── ko/   (same tree, Korean)
+```
+
+After apply, the target project has:
 
 ```
 .autopilot/
-├── PROMPT.md                 # IMMUTABLE 블록 포함 보일러플레이트
-├── RUN.claude-code.md        # Claude Code 데스크톱 복붙 + ScheduleWakeup
-├── RUN.codex-desktop.md      # Codex 데스크톱 큐잉용 복붙
-├── STATE.md                  # 연속성 저장 (세션 간 공유)
-├── BACKLOG.md                # 시드 과제
-├── HISTORY.md                # iter 로그
-├── METRICS.jsonl             # iter별 메트릭 (빈 시드)
-├── NEXT_DELAY                # 다음 대기 초 (기본 900)
-├── runners/
-│   ├── runner.ps1            # Windows 무한 루프
-│   └── runner.sh             # macOS/Linux 무한 루프
-└── hooks/
-    ├── pre-commit            # IMMUTABLE 가드 진입점
-    ├── protect.sh            # IMMUTABLE 블록 + cleanup trailer
-    ├── protect.ps1           # Windows 동등물
-    └── commit-msg*           # trailer 검증
-apply.ps1                      # Windows 설치자
-apply.sh                       # Unix 설치자
+├── config.json                  # project_name, operator_language, directive, ...
+├── PROMPT.md                    # placeholders already rendered
+├── RUN.claude-code.md
+├── RUN.codex-desktop.md
+├── STATE.md, BACKLOG.md, HISTORY.md, PITFALLS.md, EVOLUTION.md
+├── project.ps1                  # .\.autopilot\project.ps1 status → HTML dashboard
+├── OPERATOR-TEMPLATE.html
+├── locales/{en,<lang>}/strings.json
+├── runners/, hooks/
+└── NEXT_DELAY, METRICS.jsonl
 ```
 
-## 설계 원칙
+## Design principles
 
-- **Stateless prompt + stateful files**: 프롬프트는 `.autopilot/*` 를 읽어 상태를 복원
-- **IMMUTABLE 가드**: `product-directive`, `core-contract`, `boot`, `budget`, `blast-radius`, `halt`, `exit-contract` 블록은 pre-commit 훅이 변경 거부
-- **DAD 피어 대화**: `Document/dialogue/sessions/{session-id}/turn-*.yaml` 규약 (옵션)
-- **Cross-platform**: Windows PowerShell + Unix bash 동등 구현
-- **No GUI required**: 대시보드가 필요하면 별도 skill로 추가
+- **Stateless prompt + stateful files** — `PROMPT.md` reads `.autopilot/*` to restore state each turn.
+- **IMMUTABLE guard** — `product-directive`, `core-contract`, `boot`, `budget`, `blast-radius`, `halt`, `exit-contract` blocks are rejected by the pre-commit hook if edited.
+- **i18n by config** — operator-facing output (dashboard labels, status lines, glossary) is driven by `locales/<lang>/strings.json`; shipping a new language = adding one JSON file.
+- **DAD peer dialogue** — `Document/dialogue/sessions/<id>/turn-*.yaml` schema; dashboard surfaces session status (converged / active / blocked) with localized labels.
+- **Cross-platform** — PowerShell + bash equivalents for apply, runner, protect, project.
+- **Operator dashboard** — `project.ps1 status` emits `OPERATOR-LIVE.{json,html}` so a non-technical operator opens one HTML file to see iter count, recent flow, open PRs, DAD sessions, and a glossary — all in their language.
 
-## 라이선스
+## Adding a new language
+
+1. `cp -r locales/en locales/<tag>`
+2. Translate `.autopilot/*.md` bodies (keep `{{PLACEHOLDERS}}` and IMMUTABLE block headers verbatim).
+3. Translate `strings.json` values (keep keys).
+4. PR.
+
+## License
 
 MIT

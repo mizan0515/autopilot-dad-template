@@ -1,0 +1,50 @@
+{
+  "locale": "ko",
+  "display_name": "한국어",
+  "dashboard": {
+    "page_title": "오토파일럿 관리자 대시보드",
+    "eyebrow": "🤖 자동개발 로봇 대시보드",
+    "title": "관리자님은 이 화면 하나만 보면 됩니다",
+    "subtitle": "기술 정보는 최대한 숨기고, 꼭 알아야 하는 내용만 정리했습니다. <strong>지금 해야 할 일</strong> → <strong>최근 작업</strong> → <strong>남은 큰 목표</strong> 순서로 보세요.",
+    "last_updated": "마지막 갱신",
+    "now_status": "지금 상태",
+    "progress": "현재 진행률",
+    "open_prs": "열린 자동 PR",
+    "action_header": "👉 관리자님이 지금 해주실 일",
+    "summary_header": "📌 지금 꼭 알아둘 것",
+    "is_ok_label": "지금은 괜찮은가요?",
+    "today_biggest_label": "오늘 로봇이 한 가장 큰 일",
+    "pr_check_label": "PR을 지금 봐야 하나요?",
+    "big_goals": "🧭 지금 남은 큰 목표",
+    "manager_actions": "🙋 관리자 확인이 필요한 일",
+    "not_your_problem": "🧘 이건 관리자 일이 아니에요",
+    "recent_flow": "📚 최근 작업 흐름",
+    "open_pr_pane": "📬 열린 PR",
+    "dad_sessions": "🤝 두 로봇이 나눈 대화 (DAD)",
+    "dad_sessions_hint": "코덱스와 클로드 두 로봇이 최근 무엇을 의논했는지. \"대화 끝남\"은 합의 완료, \"대화 중\"은 아직 돌고 있음. 관리자가 직접 할 일은 아닙니다.",
+    "glossary_title": "🛟 헷갈리는 말 쉬운 설명",
+    "glossary_hint": "모르는 단어가 보여도 여기 설명만 보면 됩니다.",
+    "empty_dad": "아직 저장된 로봇 대화가 없습니다.",
+    "empty_timeline": "표시할 최근 작업이 없습니다.",
+    "empty_prs": "지금 열려 있는 자동 PR은 없습니다.",
+    "empty_manager_actions": "지금은 관리자님이 따로 할 일이 없습니다."
+  },
+  "status_labels": {
+    "converged": "✅ 대화 끝남",
+    "active": "💬 대화 중",
+    "blocked": "⏸ 멈춤",
+    "unknown": "ℹ 상태 모름"
+  },
+  "runner": {
+    "halt_detected": "🛑 HALT 감지 — 운영자가 재개할 때까지 기다립니다.",
+    "starting": "🚀 오토파일럿 기동합니다.",
+    "finished_wait": "🏁 iter 종료. 다음 복붙을 기다립니다.",
+    "next_in": "💤 다음 작업은 {seconds}초 뒤 자동 시작됩니다."
+  },
+  "glossary": [
+    {"term": "Gate", "meaning": "게임/제품이 실제로 플레이/사용 가능한지 확인하는 체크리스트. 관리자 숙제 아니고 로봇이 다음으로 해결할 큰 일."},
+    {"term": "PR", "meaning": "자동개발 로봇이 만든 변경 묶음. 상태판에 PR 확인이 뜰 때만 보면 됩니다."},
+    {"term": "LOCK", "meaning": "지금 로봇이 돌고 있는지 표시하는 잠금. 죽은 LOCK 이면 start 가 자동 정리합니다."},
+    {"term": "Cleanup", "meaning": "예전 브랜치나 찌꺼기 정리 작업. 대부분 관리자가 직접 처리할 일은 아닙니다."}
+  ]
+}
