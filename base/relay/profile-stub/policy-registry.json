@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "policies": [
+    {
+      "id": "no-main-push",
+      "description": "No direct push to main/master. All work goes via feature branch + PR.",
+      "enforcement": "hard-stop",
+      "applies_to": ["git push"]
+    },
+    {
+      "id": "no-hook-bypass",
+      "description": "Never use --no-verify, --no-gpg-sign, or similar hook-bypass flags.",
+      "enforcement": "hard-stop",
+      "applies_to": ["git commit", "git merge"]
+    },
+    {
+      "id": "pr-language-convention",
+      "description": "PR title + body render in operator_language (from .autopilot/config.json).",
+      "enforcement": "soft-guidance",
+      "applies_to": ["pr create"]
+    },
+    {
+      "id": "utf8-bom-contract",
+      "description": "Agent-facing Markdown (PROJECT-RULES.md, CLAUDE.md, AGENTS.md, DIALOGUE-PROTOCOL.md, .claude/commands/*.md, .prompts/*.md) must be UTF-8 with BOM. Exception: .agents/skills/**/SKILL.md and .agents/skills/**/agents/openai.yaml must be UTF-8 without BOM.",
+      "enforcement": "validator-check",
+      "applies_to": ["file write"]
+    }
+  ]
+}

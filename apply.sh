@@ -280,6 +280,8 @@ Relay:    $RELAY_DISPLAY
 Next steps:
   1. Review .autopilot/config.json and .autopilot/BACKLOG.md (replace seed tasks).
   2. Review PROJECT-RULES.md / CLAUDE.md / AGENTS.md at repo root and fill in project-specific guardrails.
-  3. git add .autopilot .githooks .github tools PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
+  3. git add .autopilot .githooks .github tools .claude .agents .prompts relay PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
   4. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
+  5. (Optional) To enable MCP pass-through + centralized token budget, see relay/SETUP.md.
+     Without a relay, DAD still works in user-bridged mode (copy/paste peer prompts).
 HINT

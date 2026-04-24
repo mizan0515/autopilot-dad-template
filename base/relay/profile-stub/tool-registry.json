@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "tool_classes": [
+    {
+      "class": "edit-file",
+      "description": "Structured file edits (patch, targeted replace).",
+      "default_allowed": true
+    },
+    {
+      "class": "read-file",
+      "description": "Read repository files.",
+      "default_allowed": true
+    },
+    {
+      "class": "shell-command",
+      "description": "Run a shell command. Subject to PROJECT-RULES.md guardrails (no --no-verify, no main push).",
+      "default_allowed": true
+    },
+    {
+      "class": "compact-artifact",
+      "description": "Write or read compact artifact files under generated/ or .autopilot/.",
+      "default_allowed": true
+    },
+    {
+      "class": "route-artifact",
+      "description": "Write routing decisions and execution-mode selection artifacts.",
+      "default_allowed": true,
+      "requires": "orchestrator"
+    },
+    {
+      "class": "powershell-script",
+      "description": "Invoke a PowerShell script under tools/ or scripts/.",
+      "default_allowed": true
+    },
+    {
+      "class": "mcp-call",
+      "description": "Invoke an MCP server tool (Unity MCP, Claude Preview, etc.).",
+      "default_allowed": true,
+      "passthrough": true,
+      "note": "When mcp_passthrough is true, the relay forwards the call so both peers observe the same result."
+    }
+  ]
+}

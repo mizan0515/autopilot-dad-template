@@ -1,0 +1,16 @@
+{
+  "slug": "myproject",
+  "display_name": "My Project",
+  "directive": "Ship a working v1. Focus on user value; avoid premature abstraction.",
+  "mcp_passthrough": true,
+  "buckets": [
+    "general",
+    "docs-or-autopilot"
+  ],
+  "execution_modes": [
+    "direct-codex",
+    "docs-lite",
+    "relay-dad"
+  ],
+  "artifact_root": "generated"
+}
