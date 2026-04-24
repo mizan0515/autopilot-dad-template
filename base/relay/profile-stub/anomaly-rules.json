@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "rules": [
+    {
+      "id": "consecutive-checkpoint-fails",
+      "description": "3+ consecutive FAILs on the same DAD checkpoint → ESCALATE.",
+      "severity": "high",
+      "action": "escalate-to-user"
+    },
+    {
+      "id": "quality-stall",
+      "description": "2+ turns without net progress on any checkpoint → ESCALATE.",
+      "severity": "medium",
+      "action": "escalate-to-user"
+    },
+    {
+      "id": "token-ceiling-breach",
+      "description": "Cumulative output tokens exceed maxCumulativeOutputTokens.",
+      "severity": "hard-stop",
+      "action": "abort-session"
+    },
+    {
+      "id": "low-cache-read-ratio",
+      "description": "cache_read_ratio below cacheReadRatioFloor for consecutiveLowCacheTurnsThreshold turns → compaction review.",
+      "severity": "medium",
+      "action": "flag-for-compaction"
+    }
+  ]
+}

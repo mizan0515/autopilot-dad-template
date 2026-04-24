@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "contracts": [
+    {
+      "skill": "myproject-dialogue-start",
+      "requires": {
+        "tool_classes": ["edit-file", "read-file", "shell-command", "compact-artifact"],
+        "execution_modes": ["relay-dad"],
+        "buckets": ["general", "docs-or-autopilot"]
+      },
+      "emits": ["turn-packet", "peer-prompt-artifact"]
+    },
+    {
+      "skill": "myproject-repeat-workflow",
+      "requires": {
+        "tool_classes": ["edit-file", "read-file", "shell-command", "compact-artifact"],
+        "execution_modes": ["relay-dad"],
+        "buckets": ["general", "docs-or-autopilot"]
+      },
+      "emits": ["turn-packet", "peer-prompt-artifact"]
+    },
+    {
+      "skill": "myproject-repeat-workflow-auto",
+      "requires": {
+        "tool_classes": ["edit-file", "read-file", "shell-command", "compact-artifact", "mcp-call"],
+        "execution_modes": ["relay-dad"],
+        "buckets": ["general", "docs-or-autopilot"]
+      },
+      "emits": ["turn-packet", "peer-prompt-artifact", "commit", "pr"]
+    }
+  ]
+}
