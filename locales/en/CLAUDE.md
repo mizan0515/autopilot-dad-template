@@ -66,6 +66,18 @@ When the operator language is `{{OPERATOR_LANG}}`, write PR titles and bodies in
 
 Exception: English remains acceptable for highly technical conventional-commit prefixes (`fix:`, `chore:`, `feat:`) followed by operator-language body text.
 
+## Extended thinking · token budget · cache regression
+
+Claude Code uses extended thinking automatically based on task difficulty (no env flag). Shape it explicitly within a turn:
+- Spend depth generously on design decisions, root-cause tracing, multi-file refactors, and drafting DAD Sprint Contracts.
+- Drop into Read → Edit mechanical loops for repetitive edits to conserve tokens.
+- Relay broker caps from `relay/profile-stub/broker.*.json` (`maxCumulativeOutputTokens`, `maxTurnsPerSession`) are the per-session ceiling.
+
+The `.autopilot/PROMPT.md` IMMUTABLE budget block takes precedence. Operational add-ons:
+- If cache-read-ratio stays below 0.25 for 2 consecutive iters, switch to a summarization turn immediately and follow `.prompts/12-context-summarization-policy.md`.
+- If per-iter file-read soft cap (20) or shell-call soft cap (30) is exceeded, append a "context sprawl" entry to `.autopilot/PITFALLS.md`.
+- If this regression accumulates 3 times, write a prompt-shrink proposal into `.autopilot/EVOLUTION.md` and halt the autonomous loop until the operator approves.
+
 ---
 
 ## Standalone Stance

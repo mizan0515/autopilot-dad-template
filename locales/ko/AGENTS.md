@@ -71,6 +71,20 @@ Dual-Agent Dialogue 플로우로 협업할 때는 `DIALOGUE-PROTOCOL.md` 를 따
 
 작업이 한 폴더에 한정됨이 명확하면, 실제로 경계를 넘는 변경이 아닌 한 무관한 큰 문서를 다시 열지 않는다.
 
+## 확장 추론 (extended thinking)
+
+Codex CLI 는 어려운 계획/디자인/디버그 단계에서 `CCR_CODEX_REASONING_EFFORT=high` 환경변수를 켠 상태로 실행한다. 짧은 기계적 편집 턴에서는 `medium` 또는 미지정으로 돌려 토큰을 아낀다. 수준 판단 기준:
+- `high`: 설계 결정, 근본 원인 추적, 다중 파일 리팩터, DAD Sprint Contract 초안
+- `medium`: 테스트 추가, 문서 동기화, 단일 파일 버그 수정
+- 설정 위치: 릴레이 브로커는 `relay/profile-stub/broker.*.json` 의 `maxCumulativeOutputTokens` / `maxTurnsPerSession` 도 함께 본다. 이 값이 `extended thinking` 예산의 실질 상한이다.
+
+## 토큰 예산과 캐시 회귀
+
+`.autopilot/PROMPT.md` IMMUTABLE budget 블록이 우선한다. 추가 운영 규약:
+- 연속 2 iter 동안 캐시 읽기 비율이 0.25 미만이면 즉시 요약 턴으로 전환하고 `.prompts/12-맥락-요약-정책.md` 의 절차를 따른다.
+- iter 당 파일 읽기 20회 / 셸 호출 30회 soft cap 을 넘으면 `PITFALLS.md` 에 "맥락 폭주" 항목을 추가한다.
+- 이 회귀가 3회 누적되면 `EVOLUTION.md` 에 프롬프트 축소 제안을 적고 자동 루프를 중단한다 (사용자 승인이 있어야 재개).
+
 ## 검색 루트
 
 검색은 `.autopilot/config.json` → `search_roots` 에 선언된 소스 디렉터리로 한정한다. 일반 프로젝트의 기본 루트:

@@ -71,6 +71,20 @@ Use the smallest context that can finish the task:
 
 If a task is clearly local to one folder, do not re-open unrelated large docs unless the change actually crosses those boundaries.
 
+## Extended thinking
+
+Run Codex CLI with `CCR_CODEX_REASONING_EFFORT=high` for hard planning / design / debugging turns. Drop to `medium` or leave unset for short mechanical edit turns to save tokens. Level guidance:
+- `high`: architecture decisions, root-cause tracing, multi-file refactors, drafting DAD Sprint Contract
+- `medium`: adding tests, doc sync, single-file bug fixes
+- Config location: the relay broker also respects `maxCumulativeOutputTokens` / `maxTurnsPerSession` in `relay/profile-stub/broker.*.json` — those are the real ceiling on an extended-thinking session.
+
+## Token budget + cache regression
+
+`.autopilot/PROMPT.md` IMMUTABLE budget block takes precedence. Operational add-ons:
+- If cache-read-ratio stays below 0.25 for 2 consecutive iters, switch to a summarization turn immediately and follow `.prompts/12-context-summarization-policy.md`.
+- If per-iter file-read soft cap (20) or shell-call soft cap (30) is exceeded, append a "context sprawl" entry to `PITFALLS.md`.
+- If this regression accumulates 3 times, write a prompt-shrink proposal into `EVOLUTION.md` and halt the autonomous loop until the operator approves.
+
 ## Search roots
 
 Keep searches scoped to source directories declared in `.autopilot/config.json` → `search_roots`. Default roots for most projects:

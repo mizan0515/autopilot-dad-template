@@ -37,6 +37,7 @@
 | 09 | `09-비상-세션-복구.md` | DAD 세션/state.json 비상 복구 및 force-close 절차 | 시스템 |
 | 10 | `10-시스템-문서-정합성-동기화.md` | 시스템 규칙 문서, command, skill, validator 동기화 | 시스템 |
 | 11 | `11-DAD-시스템-운영-감사.md` | 현재 DAD 시스템과 프롬프트의 노후화/drift 점검 | 시스템 |
+| 12 | `12-맥락-요약-정책.md` | 피어 핸드오프 `handoff.context` 를 `CarryForwardMaxBytes` 아래로 유지 | 시스템 |
 
 ---
 

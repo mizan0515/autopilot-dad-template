@@ -112,7 +112,7 @@ Debate 절차, 사용자 개입 지점, 자율/감독/하이브리드 모드, Me
 
 턴 간 핸드오프 데이터는 바이트 캡이 있다. Relay 브로커는 `handoff.context` 를 `CarryForwardMaxBytes` (기본 2048) 로 잘라내고 `…truncated` 를 붙인다. 캡 이상의 이력이 필요하면 피어는 `state.json` + 이전 `turn-{N}.yaml` 을 직접 읽는다 (relay 에 재요청하지 않는다). Peer prompt 는 가능하면 캐리 맥락 ~1.5KB 이내로 유지.
 
-한 턴 이상의 맥락을 작업이 요구할 때 피어가 적용하는 요약 규칙은 `.prompts/12-context-summarization-policy.md` 를 본다.
+한 턴 이상의 맥락을 작업이 요구할 때 피어가 적용하는 요약 규칙은 `.prompts/12-맥락-요약-정책.md` 를 본다.
 
 ---
 
