@@ -212,6 +212,23 @@ try {
   if (Test-Path $enStr)  { Copy-Item $enStr  (Join-Path $Target '.autopilot/locales/en/strings.json') -Force }
   if (Test-Path $locStr) { Copy-Item $locStr (Join-Path $Target ".autopilot/locales/$Language/strings.json") -Force }
 
+  # --- Codex skill rebranding --------------------------------------------
+  # If the template shipped default "cardgame-*" skills, rename them to the
+  # project's slug and rewrite metadata via Set-CodexSkillNamespace.ps1.
+  $skillsRoot = Join-Path $Target '.agents/skills'
+  $setNsTool  = Join-Path $Target 'tools/Set-CodexSkillNamespace.ps1'
+  if ((Test-Path $skillsRoot) -and (Test-Path $setNsTool)) {
+    # Derive a safe lowercase slug from the project name.
+    $slug = ($Name.ToLowerInvariant() -replace '[^a-z0-9-]', '-').Trim('-')
+    if (-not $slug) { $slug = 'myproject' }
+    # Only rebrand if shipped defaults are still present.
+    $hasDefault = Test-Path (Join-Path $skillsRoot 'cardgame-dialogue-start')
+    if ($hasDefault -and $slug -ne 'cardgame') {
+      Write-Host "[apply] rebranding Codex skills: cardgame-* -> $slug-*"
+      & $setNsTool -Namespace $slug -RepoRoot $Target -ProjectLabel $Name | Out-Null
+    }
+  }
+
   # --- hooks --------------------------------------------------------------
   # Prefer top-level .githooks/ (canonical validator chain).
   # Fall back to .autopilot/hooks/ for legacy layouts.

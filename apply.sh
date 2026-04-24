@@ -225,6 +225,24 @@ if [ -d "$WORK/template/locales/$LANG_ARG" ]; then
   cp "$WORK/template/locales/$LANG_ARG/strings.json" "$TARGET/.autopilot/locales/$LANG_ARG/strings.json" 2>/dev/null || true
 fi
 
+# --- Codex skill rebranding ----------------------------------------------
+# If the template shipped default "cardgame-*" skills, rename them to the
+# project's slug and rewrite metadata via Set-CodexSkillNamespace.ps1.
+if [ -d "$TARGET/.agents/skills" ] && [ -f "$TARGET/tools/Set-CodexSkillNamespace.ps1" ]; then
+  SLUG="$(printf '%s' "$NAME_ARG" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')"
+  if [ -z "$SLUG" ]; then SLUG="myproject"; fi
+  if [ -d "$TARGET/.agents/skills/cardgame-dialogue-start" ] && [ "$SLUG" != "cardgame" ]; then
+    echo "[apply] rebranding Codex skills: cardgame-* -> ${SLUG}-*"
+    if command -v pwsh >/dev/null 2>&1; then
+      pwsh -ExecutionPolicy Bypass -File "$TARGET/tools/Set-CodexSkillNamespace.ps1" -Namespace "$SLUG" -RepoRoot "$TARGET" -ProjectLabel "$NAME_ARG" >/dev/null || echo "[apply] skill rebrand failed (continuing)"
+    elif command -v powershell >/dev/null 2>&1; then
+      powershell -ExecutionPolicy Bypass -File "$TARGET/tools/Set-CodexSkillNamespace.ps1" -Namespace "$SLUG" -RepoRoot "$TARGET" -ProjectLabel "$NAME_ARG" >/dev/null || echo "[apply] skill rebrand failed (continuing)"
+    else
+      echo "[apply] pwsh/powershell not found — skipping skill rebrand (you can run tools/Set-CodexSkillNamespace.ps1 -Namespace $SLUG manually)"
+    fi
+  fi
+fi
+
 # --- hooks ----------------------------------------------------------------
 # Prefer top-level .githooks/ (canonical validator chain).
 # Fall back to .autopilot/hooks/ for legacy layouts.
