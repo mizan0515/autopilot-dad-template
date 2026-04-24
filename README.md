@@ -8,17 +8,17 @@ chosen at apply time, so dashboards, status lines, and glossary render in that l
 
 ## One-prompt bootstrap (Claude Code / Codex)
 
-> Apply the template at `https://github.com/mizan0515/autopilot-dad-template` to the current project.
->
-> Dialogue flow:
-> 1. **Agent asks**: "What operator language? (en, ko, ja, zh-CN, es, fr, de, or any BCP-47 tag — default en)"
-> 2. **Operator answers**: e.g. "English" / "한국어" / "ja".
-> 3. **Agent runs** `apply.ps1 -Language <tag>` (Windows) or `./apply.sh --language <tag>` (macOS/Linux) from the project root, answering the project-name/description/directive prompts from context if known, otherwise asking.
-> 4. Installer writes `.autopilot/config.json`, copies `base/` + `locales/<lang>/` into `.autopilot/`, renders placeholders in `PROMPT.md`, and registers hooks via `git config core.hooksPath .autopilot/hooks`.
-> 5. If `<lang>` is not shipped, English templates are copied but `operator_language` in config is set to `<lang>` so the agent still renders runtime text in that language.
-> 6. Any existing `.autopilot/*` files are preserved; differing incoming files land in `.apply-conflicts/`. **Abort** if conflicts ≥ 5.
-> 7. Agent replaces the seed items in `.autopilot/BACKLOG.md` with the project's real first 1–3 tasks.
-> 8. First iter: paste `.autopilot/RUN.claude-code.md` into Claude Code desktop (or `RUN.codex-desktop.md` into Codex). The runner self-schedules via `ScheduleWakeup`.
+See [BOOTSTRAP.md](BOOTSTRAP.md) for the full paste-ready orchestrator prompt. Short summary of what it does:
+
+1. Asks the operator for their language (BCP-47 tag — any language works; shipped locales are `en`, `ko`).
+2. Checks prerequisites (git, gh, pwsh/bash, gh auth, claude/codex CLI) and stops with a concrete install hint if anything is missing.
+3. Runs `git init` if the target dir is not yet a git repo.
+4. Asks for project name / description / product directive.
+5. Clones this template to a temp dir and runs `apply.ps1` / `apply.sh` against the target.
+6. Smoke-checks via `.autopilot/runners/preflight.ps1`.
+7. Replaces the seed items in `.autopilot/BACKLOG.md` with real first tasks based on the directive.
+8. Commits the bootstrap (does not push).
+9. Tells the operator to paste `.autopilot/RUN.claude-code.md` or `.autopilot/RUN.codex-desktop.md` to start the loop.
 
 The same prompt works regardless of project type (Unity / web / CLI / library).
 
