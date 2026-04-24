@@ -96,6 +96,23 @@ Right before exiting, in this order:
 
 ---
 
+## Prompt economy (lite mode)
+
+For iters whose actual work is small (idle-upkeep, BACKLOG grooming, HISTORY rotation), the full-prompt boot cost dominates. A slim variant lives at `.autopilot/PROMPT.lite.md`. Switch by setting:
+
+```sh
+AUTOPILOT_PROMPT_RELATIVE=.autopilot/PROMPT.lite.md
+```
+
+in the runner environment (the runner already reads this env var). The lite prompt is strict: code edits / PR creation / evolution / IMMUTABLE edits are forbidden and it will `escalate` back to the full prompt by writing `prompt-escalation-required: <reason>` to STATE and exiting with `NEXT_DELAY=60`.
+
+Recommended cadence:
+- **Default**: full `PROMPT.md`.
+- **Maintenance streak**: after 3 consecutive iters whose outcome was `idle-upkeep`, the operator's runner may auto-switch to lite for the next idle pass. First escalation signal switches it back.
+- **After a fresh commit to BACKLOG with an incident/pitfall tag**: stay on full prompt — lite cannot work those tags if they need code change.
+
+---
+
 ## Runtime-evidence trust gate
 
 `preflight.{ps1,sh}` runs two hooks separately:

@@ -96,6 +96,23 @@ iter 시작 직후:
 
 ---
 
+## 프롬프트 경제성 (lite mode)
+
+실제 작업이 작은 iter (idle-upkeep, BACKLOG 정리, HISTORY 회전) 는 full prompt boot cost 가 지배한다. 슬림 변형본이 `.autopilot/PROMPT.lite.md` 에 있다. 러너 환경에서:
+
+```sh
+AUTOPILOT_PROMPT_RELATIVE=.autopilot/PROMPT.lite.md
+```
+
+로 전환 (러너는 이미 이 env var 를 읽는다). lite 프롬프트는 strict 하다: 코드 편집 · PR 생성 · evolution · IMMUTABLE 편집 금지이며, STATE 에 `prompt-escalation-required: <reason>` 를 적고 `NEXT_DELAY=60` 으로 종료해 full prompt 로 escalate 한다.
+
+권장 cadence:
+- **기본값**: full `PROMPT.md`.
+- **유지보수 streak**: outcome 이 `idle-upkeep` 인 iter 가 3 회 연속이면 operator 의 러너는 다음 idle 패스에 lite 로 auto-switch 할 수 있다. 첫 escalation 신호에 다시 full 로 복귀.
+- **incident/pitfall 태그가 BACKLOG 에 새로 올라온 iter 직후**: full prompt 유지 — 코드 변경이 필요한 태그면 lite 로는 처리 못 한다.
+
+---
+
 ## 런타임 증거 신뢰 게이트
 
 `preflight.{ps1,sh}` 는 두 개의 훅을 분리해서 실행한다:
