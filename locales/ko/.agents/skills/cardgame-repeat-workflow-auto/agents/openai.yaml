@@ -1,0 +1,7 @@
+interface:
+  display_name: "CardGame DAD v2 Repeat Workflow (Auto)"
+  short_description: "Auto mode for CardGame DAD v2 with relay still required"
+  default_prompt: "Use $cardgame-repeat-workflow-auto to continue the active CardGame DAD v2 session in auto mode and escalate only when the safety rails require it."
+
+policy:
+  allow_implicit_invocation: false
