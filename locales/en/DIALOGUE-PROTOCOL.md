@@ -116,6 +116,18 @@ See `.prompts/12-context-summarization-policy.md` for the detailed summarization
 
 ---
 
+## Protocol invariants (forbidden patterns)
+
+These patterns have caused incidents in downstream relays; the validator treats each as a hard fail.
+
+1. **No role-conditional branches.** Code paths, peer prompts, `.prompts/` files, or skills MUST NOT branch on `if agent == "codex"` / `if agent == "claude"`. The protocol is symmetric. Capability differences (tool-use depth, extended-thinking budget, streaming) are injected via a cost-advisor / strategy pattern, not by role-tested conditionals. Any such branch is an `IMMUTABLE:mission` violation.
+2. **`final_no_handoff` + populated `next_task` is forbidden.** When a turn sets the session-final flag, `handoff.next_task` MUST be empty or omitted. Populated `next_task` on a final turn is a migration hazard — the next session starts on stale state.
+3. **`recovery_resume` requires explicit evidence.** A turn that resumes after an interrupted prior turn (operator re-entry, broker crash) MUST set `confidence: low` and include at least one `open_risks` entry describing what was interrupted. Using `recovery_resume` to skip handoffs or convergence gates is a validator reject.
+4. **MCP call correlation is not recorded in the session audit log.** The per-peer JSONL audit log CANNOT attribute which MCP tool was invoked mid-turn (bridge design limit). Turn packets record MCP calls under `evidence.mcp_calls`, but cross-referencing them to audit-log entries is explicitly unsupported. Do not build validator rules that assume correlation.
+5. **METRICS.jsonl schema.** Tier-1 fields (including `ts`, `iter`, `outcome`) are required on every line. Project-scoped extensions MUST use a `<project>_` prefix to avoid collisions with relay Tier-3 fields. Validate via `tools/Validate-Metrics.ps1` where shipped.
+
+---
+
 ## Agent definitions
 
 Claude Code (conversational, `CLAUDE.md`) and Codex (batch, `AGENTS.md`) are distinct agent endpoints. The protocol does not assume model equality. Each turn packet should surface the agent's actual strengths and limits.
