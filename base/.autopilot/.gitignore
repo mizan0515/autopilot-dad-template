@@ -1,0 +1,20 @@
+# Runtime-only files
+LOCK
+HALT
+NEXT_DELAY
+.audit-cache.*
+OPERATOR-LIVE.*.html
+OPERATOR-LIVE.*.json
+DASHBOARD-LIVE.*.html
+DASHBOARD-LIVE.*.json
+RUNNER-LIVE.json
+generated/
+
+# METRICS.jsonl: committed so self-evolution can read history.
+# Uncomment to gitignore instead:
+# METRICS.jsonl
+
+# Stalled-iter snapshots + failure ledger (runtime forensics, not history)
+stalled/
+FAILURES.jsonl
+qa-evidence/
