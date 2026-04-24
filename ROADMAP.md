@@ -34,7 +34,7 @@
 
 한 PR 당 한 phase. 각 phase 는 독립 병합 가능하도록 설계. 실패 시 해당 phase 만 revert.
 
-### Phase 1 — 최상위 시스템 문서 (language-aware scaffold)
+### Phase 1 — 최상위 시스템 문서 (language-aware scaffold) ✅ #5
 
 **목적:** Step 4 의 "PROJECT-RULES / DIALOGUE-PROTOCOL / AGENTS / CLAUDE / RTK.md" 를 템플릿이 설치하게 한다.
 
@@ -58,7 +58,7 @@
 - `Document/dialogue/README.md` 에 validator ignore-refs marker 불필요 (allowlist 로 처리)
 - CLAUDE.md 에 `--no-verify` 금지 명시 (§1.2 교훈)
 
-### Phase 2 — 검증/훅/CI 인프라
+### Phase 2 — 검증/훅/CI 인프라 ✅ #6
 
 **목적:** 템플릿 사용자가 bootstrap 직후부터 시스템 문서 정합성 / 인코딩 / DAD 패킷 검증을 받는다.
 
@@ -77,7 +77,7 @@
 - 인코딩 mojibake 방지 (INCIDENTS §2.3): `Validate-Documents.ps1` 가 이미 BOM + UTF-8 검사. 템플릿 JSON writer 들은 `[IO.File]::WriteAllText ... (New-Object Text.UTF8Encoding $false)` 패턴 강제.
 - `commit-msg` 훅으로 IMMUTABLE 블록 변경 막기 (`base/.autopilot/hooks/` 에 이미 있음 — 최상위 `.githooks/` 로 미러링 필요 여부는 apply 가 결정).
 
-### Phase 3 — .claude + .agents + .prompts
+### Phase 3 — .claude + .agents + .prompts ✅ #7
 
 **목적:** Step 4 의 .claude / .agents / .prompts 구성. Claude Code 슬래시 명령 + Codex 스킬 + 주제별 재사용 프롬프트.
 
@@ -91,7 +91,7 @@
 **재발 방지:**
 - SKILL.md / openai.yaml BOM 제거 강제 (Codex 파싱 실패 방지).
 
-### Phase 4 — relay 번들 (Step 4 의 "dad relay 폴더 자동 구성")
+### Phase 4 — relay 번들 (Step 4 의 "dad relay 폴더 자동 구성") ✅ #8
 
 **목적:** bootstrap 완료 직후 사용자가 별도 수동 작업 없이 DAD peer dialogue 가 작동하도록 한다.
 
@@ -116,7 +116,7 @@
 - infinite-rotation loop (relay iter 5) → 이미 segment-scoped counter 로 해결. 템플릿 문서에만 경고.
 - schema drift (METRICS.jsonl tier 1 vs tier 3) → `Validate-Metrics.ps1` 포팅 + METRICS 스키마 문서화.
 
-### Phase 5 — context summarization + MCP / extended thinking adapter 규약
+### Phase 5 — context summarization + MCP / extended thinking adapter 규약 ✅ #9
 
 **목적:** Step 6 의 "컨텍스트 비대 시 summarization, 피어가 MCP / agent / tool-use / extended-thinking 호출" 규약을 문서화.
 
@@ -126,7 +126,7 @@
 - `locales/{en,ko}/.prompts/12-맥락-요약-정책.md` (신규) — 피어가 context 를 어떻게 요약/캡핑하는지.
 - `base/.autopilot/PROMPT.md` IMMUTABLE `budget` 블록 업데이트: budget 임계값 현실화 (files_read 20, bash_calls 30) — INCIDENTS §2.1 재발 방지.
 
-### Phase 6 — CLI 로그인 가이드 + 자기 언어 PR + 대시보드 운영자 surface
+### Phase 6 — CLI 로그인 가이드 + 자기 언어 PR + 대시보드 운영자 surface ✅ #10
 
 **목적:** Step 5 (CLI 로그인), Step 7 (대시보드 + 자기 언어 PR) 마감.
 
@@ -137,7 +137,7 @@
 - `base/.autopilot/project.ps1` 대시보드 출력이 이미 i18n. PR 목록 섹션에 title 언어 검증 추가.
 - `base/.autopilot/OPERATOR-TEMPLATE.html` 이미 i18n. 대시보드에 **DAD peer dialogue 섹션** (session-status: active/converged/blocked) + **최근 PR 5개 섹션** 추가.
 
-### Phase 7 — 누적 사고 재발 방지 최종 점검
+### Phase 7 — 누적 사고 재발 방지 최종 점검 ✅ #11 (결과: [AUDIT.md](AUDIT.md))
 
 **목적:** INCIDENTS.md §1 (card-climber) + §2 + §3 + relay PITFALLS 를 교차 점검해 템플릿이 빠뜨린 것이 없는지 확인.
 
