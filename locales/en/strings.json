@@ -1,0 +1,50 @@
+{
+  "locale": "en",
+  "display_name": "English",
+  "dashboard": {
+    "page_title": "Autopilot Operator Dashboard",
+    "eyebrow": "🤖 Autonomous Dev Robot",
+    "title": "Everything you need is on this one screen",
+    "subtitle": "Technical details are hidden. Read the <strong>action needed</strong> first, then <strong>recent work</strong> and <strong>big goals</strong>.",
+    "last_updated": "Last updated",
+    "now_status": "Current status",
+    "progress": "Progress",
+    "open_prs": "Open PRs",
+    "action_header": "👉 What you should do now",
+    "summary_header": "📌 Things to know right now",
+    "is_ok_label": "Is it OK right now?",
+    "today_biggest_label": "Biggest thing the robot did today",
+    "pr_check_label": "Do I need to look at PRs?",
+    "big_goals": "🧭 Current big goals",
+    "manager_actions": "🙋 Items needing operator input",
+    "not_your_problem": "🧘 Things you don't have to worry about",
+    "recent_flow": "📚 Recent work flow",
+    "open_pr_pane": "📬 Open PRs",
+    "dad_sessions": "🤝 Two robots talking (DAD sessions)",
+    "dad_sessions_hint": "Recent Codex↔Claude peer conversations. \"Converged\" means both agreed; \"Active\" means still going. Operator doesn't need to do anything here.",
+    "glossary_title": "🛟 Plain-language glossary",
+    "glossary_hint": "Just look here if a term is unfamiliar.",
+    "empty_dad": "No saved robot conversations yet.",
+    "empty_timeline": "No recent activity to show.",
+    "empty_prs": "No open auto-PRs right now.",
+    "empty_manager_actions": "Nothing for the operator to do right now."
+  },
+  "status_labels": {
+    "converged": "✅ Talk ended",
+    "active": "💬 Talking",
+    "blocked": "⏸ Paused",
+    "unknown": "ℹ Unknown"
+  },
+  "runner": {
+    "halt_detected": "🛑 HALT detected — waiting for operator to resume.",
+    "starting": "🚀 Autopilot starting.",
+    "finished_wait": "🏁 Iter finished. Waiting for next paste.",
+    "next_in": "💤 Next iter in {seconds}s."
+  },
+  "glossary": [
+    {"term": "Gate", "meaning": "A checklist for whether the game/product is actually playable/usable. Not the operator's job — it's the robot's next big task."},
+    {"term": "PR", "meaning": "A change bundle the robot opened. Only look when the dashboard says \"PR check needed\"."},
+    {"term": "LOCK", "meaning": "A flag showing the robot is currently running. Dead locks are cleaned up automatically on start."},
+    {"term": "Cleanup", "meaning": "Removing old branches or scratch artifacts. Usually not the operator's job."}
+  ]
+}

@@ -1,6 +1,6 @@
 # EVOLUTION
 
-오토파일럿 자기 개선 로그. PROMPT.md/runner/훅을 고친 기록.
+PROMPT.md / runner / 훅 자기 개선 로그.
 
 ## 시드
 

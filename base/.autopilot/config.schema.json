@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "autopilot config",
+  "description": "Project-level autopilot configuration. Written by apply.{ps1,sh} on template install; hand-edit to change.",
+  "type": "object",
+  "required": ["project_name", "operator_language"],
+  "properties": {
+    "project_name": {
+      "type": "string",
+      "description": "Human-readable project name."
+    },
+    "project_description": {
+      "type": "string",
+      "description": "One-paragraph description used by the agent for context."
+    },
+    "product_directive": {
+      "type": "string",
+      "description": "The north-star product directive. Embedded into PROMPT.md IMMUTABLE block."
+    },
+    "operator_language": {
+      "type": "string",
+      "description": "IETF BCP-47 language tag (en, ko, ja, zh-CN, es, fr, de, ...). Operator-facing output uses this.",
+      "default": "en"
+    },
+    "template_version": {
+      "type": "string",
+      "description": "Template revision this project was bootstrapped from."
+    },
+    "autopilot_ai": {
+      "type": "string",
+      "enum": ["claude", "codex", "custom"],
+      "description": "Which AI the runner pipes PROMPT.md to.",
+      "default": "claude"
+    },
+    "next_delay_default": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600,
+      "default": 900,
+      "description": "Default wait seconds between iters when NEXT_DELAY is unset."
+    }
+  }
+}
