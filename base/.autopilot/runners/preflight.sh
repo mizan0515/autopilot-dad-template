@@ -64,6 +64,18 @@ case "$AI" in
   *) problems+=("unknown-ai:$AI") ;;
 esac
 
+# 4. PROMPT.md exists (Row 12: empty-prompt infinite loop)
+if [ ! -f "$AUTOPILOT_ROOT/PROMPT.md" ]; then
+  problems+=("prompt-missing")
+fi
+
+# 5. Optional project-specific verify hook (Row 8 slot)
+if [ -x "$AUTOPILOT_ROOT/hooks/preflight-verify.sh" ]; then
+  if ! "$AUTOPILOT_ROOT/hooks/preflight-verify.sh" "$AUTOPILOT_ROOT"; then
+    problems+=("verify-hook-failed")
+  fi
+fi
+
 if [ "${#problems[@]}" -gt 0 ]; then
   reason="$(IFS=, ; echo "${problems[*]}")"
   echo "[preflight] FAILED: $reason" >&2
