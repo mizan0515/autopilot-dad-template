@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# .autopilot/hooks/pre-commit — canonical git hook entry point.
+#
+# 1. protect.sh  → IMMUTABLE block guard on .autopilot/PROMPT.md
+# 2. .githooks/pre-commit → existing repo validators (docs/Codex/DAD/skills)
+#
+# Both must pass. Enable via:
+#   .autopilot/project.ps1 install-hooks  (Windows)
+#   .autopilot/project.sh  install-hooks  (Unix/CI)
+
+set -euo pipefail
+
+here="$(dirname "$0")"
+repo_root="$(git rev-parse --show-toplevel)"
+
+# 1. IMMUTABLE guard
+bash "$here/protect.sh" "$@"
+
+# 2. Existing repo validators (only if the file exists — avoids hard coupling)
+if [ -x "$repo_root/.githooks/pre-commit" ]; then
+  exec "$repo_root/.githooks/pre-commit" "$@"
+fi

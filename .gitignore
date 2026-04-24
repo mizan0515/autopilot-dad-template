@@ -1,0 +1,10 @@
+# apply.* 가 생성하는 충돌 폴더
+.apply-conflicts/
+
+# 런타임 상태 (target repo 에서만 생성, 템플릿은 빈 시드)
+.autopilot/LOCK
+.autopilot/HALT
+.autopilot/LAST_RESCHEDULE
+.autopilot/RUNNER-LIVE.json
+.autopilot/OPERATOR-LIVE.ko.json
+.autopilot/OPERATOR-LIVE.ko.html

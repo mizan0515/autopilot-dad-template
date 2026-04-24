@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# .autopilot/hooks/commit-msg — trailer enforcement entry point.
+#
+# Arguments: $1 = path to commit message file (authoritative, unlike
+# .git/COMMIT_EDITMSG which pre-commit sees stale when `git commit -m` is used).
+#
+# Hook chain:
+#   1. commit-msg-protect.sh → IMMUTABLE-ADD / cleanup-operator-approved gates
+#   2. .githooks/commit-msg  → existing repo validators, if any
+
+set -euo pipefail
+
+here="$(dirname "$0")"
+repo_root="$(git rev-parse --show-toplevel)"
+
+bash "$here/commit-msg-protect.sh" "$@"
+
+if [ -x "$repo_root/.githooks/commit-msg" ]; then
+  exec "$repo_root/.githooks/commit-msg" "$@"
+fi
