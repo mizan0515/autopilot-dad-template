@@ -3,7 +3,7 @@
   autopilot-dad-template installer (Windows PowerShell).
 .DESCRIPTION
   Run from the TARGET project root:
-    .\apply.ps1                                      # interactive — prompts language, name, directive
+    .\apply.ps1                                      # interactive — prompts language, name, directive, PRD, relay
     .\apply.ps1 -Language en -Name "My Project"      # scripted
     $env:AUTOPILOT_TEMPLATE_URL = '...'; .\apply.ps1 # override template source
 
@@ -19,6 +19,8 @@ param(
   [Alias('n')][string]$Name = '',
   [string]$Description = '',
   [string]$Directive = '',
+  [string]$PrdPath = '',
+  [string]$RelayPath = '',
   [Alias('y')][switch]$Yes
 )
 
@@ -44,6 +46,48 @@ function Prompt-IfEmpty {
   return $ans
 }
 
+function Detect-Prd {
+  param([string]$Root)
+  $candidates = @(
+    'PRD.md',
+    'docs/PRD.md',
+    'Document/PRD.md',
+    '게임 규칙 명세서.md',
+    'Document/게임 규칙 명세서.md',
+    'ROADMAP.md',
+    'product.md',
+    'README.md',
+    'Document/개발 계획서.md'
+  )
+  foreach ($c in $candidates) {
+    $p = Join-Path $Root $c
+    if (Test-Path $p) { return $c }
+  }
+  return ''
+}
+
+function Render-TopLevelMd {
+  param(
+    [string]$File,
+    [string]$ProjectName,
+    [string]$Directive,
+    [string]$PrdPathValue,
+    [string]$RelayPathValue,
+    [string]$OperatorLang,
+    [string]$GuardrailsBlock
+  )
+  if (-not (Test-Path $File)) { return }
+  $t = [IO.File]::ReadAllText($File, [Text.UTF8Encoding]::UTF8)
+  $t = $t.Replace('{{PROJECT_NAME}}', $ProjectName)
+  $t = $t.Replace('{{PROJECT_DIRECTIVE}}', $Directive)
+  $t = $t.Replace('{{PRD_PATH}}', $PrdPathValue)
+  $t = $t.Replace('{{RELAY_REPO_PATH}}', $RelayPathValue)
+  $t = $t.Replace('{{OPERATOR_LANG}}', $OperatorLang)
+  $t = $t.Replace('{{PROJECT_GUARDRAILS_BLOCK}}', $GuardrailsBlock)
+  # Agent-facing Markdown must be UTF-8 with BOM (see PROJECT-RULES.md).
+  [IO.File]::WriteAllText($File, $t, (New-Object Text.UTF8Encoding $true))
+}
+
 Write-Host "[apply] autopilot-dad-template installer"
 Write-Host ""
 Write-Host "Supported operator languages: en (default), ko, ja, zh-CN, es, fr, de"
@@ -55,6 +99,18 @@ $Language    = Prompt-IfEmpty $Language    'Operator language (BCP-47, e.g. en, 
 $Name        = Prompt-IfEmpty $Name        'Project name'                                  (Split-Path $Target -Leaf)
 $Description = Prompt-IfEmpty $Description 'One-line project description'                  '(to be filled in)'
 $Directive   = Prompt-IfEmpty $Directive   'Product directive (one paragraph)'             'Ship a working v1. Focus on user value; avoid premature abstraction.'
+
+# PRD path — auto-detect, let operator override.
+$prdDetected = Detect-Prd -Root $Target
+$PrdPath     = Prompt-IfEmpty $PrdPath     "PRD / product doc path (auto-detected: '$prdDetected')" $prdDetected
+
+# Relay repo path — optional; empty means relay is not installed on this machine.
+$RelayPath   = Prompt-IfEmpty $RelayPath   'Relay repo path (optional; leave empty if none)' ''
+
+if (-not $RelayPath) { $RelayPathDisplay = '(relay not installed on this machine)' } else { $RelayPathDisplay = $RelayPath }
+if (-not $PrdPath)   { $PrdPathDisplay   = '(no PRD detected — declare in config.json doc_priority)' } else { $PrdPathDisplay = $PrdPath }
+
+$GuardrailsBlock = "_(Operator: declare project-specific guardrails here. The autopilot loop will fill this in as it learns the project.)_"
 
 $Work = Join-Path ([IO.Path]::GetTempPath()) ("autopilot-template-" + [Guid]::NewGuid())
 New-Item -ItemType Directory -Path $Work | Out-Null
@@ -112,6 +168,9 @@ try {
       project_description = $Description
       product_directive   = $Directive
       operator_language   = $Language
+      prd_path            = $PrdPath
+      relay_repo_path     = $RelayPath
+      search_roots        = @('src','lib','tests','docs','Document','Assets/Scripts','Assets/Tests','.autopilot','.agents','.prompts','tools')
       template_version    = $TemplateVersion
       autopilot_ai        = 'claude'
       next_delay_default  = 900
@@ -131,6 +190,18 @@ try {
     $t = $t.Replace('{{OPERATOR_LANGUAGE}}', $Language)
     [IO.File]::WriteAllText($promptPath, $t, (New-Object Text.UTF8Encoding $false))
     Write-Host "[apply] rendered placeholders in .autopilot/PROMPT.md"
+  }
+
+  # --- render top-level agent MDs -----------------------------------------
+  foreach ($md in @('PROJECT-RULES.md','DIALOGUE-PROTOCOL.md','AGENTS.md','CLAUDE.md','RTK.md')) {
+    $mdPath = Join-Path $Target $md
+    if (Test-Path $mdPath) {
+      Render-TopLevelMd -File $mdPath `
+        -ProjectName $Name -Directive $Directive `
+        -PrdPathValue $PrdPathDisplay -RelayPathValue $RelayPathDisplay `
+        -OperatorLang $Language -GuardrailsBlock $GuardrailsBlock
+      Write-Host "[apply] rendered placeholders in $md"
+    }
   }
 
   # --- locales dir (chosen + en fallback) ---------------------------------
@@ -167,11 +238,14 @@ try {
 
 Language: $Language
 Project:  $Name
+PRD path: $PrdPathDisplay
+Relay:    $RelayPathDisplay
 
 Next steps:
   1. Review .autopilot/config.json and .autopilot/BACKLOG.md (replace seed tasks).
-  2. git add .autopilot && git commit -m "chore: apply autopilot-dad-template"
-  3. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
+  2. Review PROJECT-RULES.md / CLAUDE.md / AGENTS.md at repo root and fill in project-specific guardrails.
+  3. git add .autopilot PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
+  4. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
 "@
 }
 finally {

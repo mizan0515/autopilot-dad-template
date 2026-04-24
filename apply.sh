@@ -2,7 +2,7 @@
 # apply.sh — autopilot-dad-template installer (Unix).
 #
 # Usage:
-#   ./apply.sh                                     # interactive — asks language, name, directive
+#   ./apply.sh                                     # interactive — asks language, name, directive, PRD, relay
 #   ./apply.sh --language en --name "My Project"   # scripted
 #   AUTOPILOT_TEMPLATE_URL=... ./apply.sh          # override template source
 #
@@ -16,6 +16,8 @@ LANG_ARG=""
 NAME_ARG=""
 DESC_ARG=""
 DIRECTIVE_ARG=""
+PRD_ARG=""
+RELAY_ARG=""
 NON_INTERACTIVE=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -23,6 +25,8 @@ while [ $# -gt 0 ]; do
     --name|-n)     NAME_ARG="$2"; shift 2 ;;
     --description) DESC_ARG="$2"; shift 2 ;;
     --directive)   DIRECTIVE_ARG="$2"; shift 2 ;;
+    --prd)         PRD_ARG="$2"; shift 2 ;;
+    --relay)       RELAY_ARG="$2"; shift 2 ;;
     --yes|-y)      NON_INTERACTIVE=1; shift ;;
     -h|--help)
       sed -n '2,15p' "$0"; exit 0 ;;
@@ -40,7 +44,30 @@ if [ ! -d "$TARGET/.git" ]; then
   exit 1
 fi
 
-# --- interactive prompts ----------------------------------------------------
+# --- PRD auto-detection ---------------------------------------------------
+detect_prd() {
+  local root="$1"
+  local candidates=(
+    "PRD.md"
+    "docs/PRD.md"
+    "Document/PRD.md"
+    "게임 규칙 명세서.md"
+    "Document/게임 규칙 명세서.md"
+    "ROADMAP.md"
+    "product.md"
+    "README.md"
+    "Document/개발 계획서.md"
+  )
+  for c in "${candidates[@]}"; do
+    if [ -f "$root/$c" ]; then
+      printf '%s' "$c"
+      return 0
+    fi
+  done
+  printf ''
+}
+
+# --- interactive prompts --------------------------------------------------
 prompt_if_empty() {
   local var_name="$1"
   local question="$2"
@@ -69,7 +96,24 @@ prompt_if_empty NAME_ARG      "Project name"                                 "$(
 prompt_if_empty DESC_ARG      "One-line project description"                 "(to be filled in)"
 prompt_if_empty DIRECTIVE_ARG "Product directive (one paragraph)"            "Ship a working v1. Focus on user value; avoid premature abstraction."
 
-# --- fetch template ---------------------------------------------------------
+PRD_DETECTED="$(detect_prd "$TARGET")"
+prompt_if_empty PRD_ARG       "PRD / product doc path (auto-detected: '$PRD_DETECTED')" "$PRD_DETECTED"
+prompt_if_empty RELAY_ARG     "Relay repo path (optional; leave empty if none)"         ""
+
+if [ -z "$PRD_ARG" ]; then
+  PRD_DISPLAY="(no PRD detected — declare in config.json doc_priority)"
+else
+  PRD_DISPLAY="$PRD_ARG"
+fi
+if [ -z "$RELAY_ARG" ]; then
+  RELAY_DISPLAY="(relay not installed on this machine)"
+else
+  RELAY_DISPLAY="$RELAY_ARG"
+fi
+
+GUARDRAILS_BLOCK="_(Operator: declare project-specific guardrails here. The autopilot loop will fill this in as it learns the project.)_"
+
+# --- fetch template -------------------------------------------------------
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 echo "[apply] fetching template from $TEMPLATE_URL"
@@ -109,32 +153,36 @@ copy_tree() {
 copy_tree "$TPL_BASE"
 copy_tree "$TPL_LOC"
 
-# --- config.json -----------------------------------------------------------
+# --- config.json ----------------------------------------------------------
 CFG="$TARGET/.autopilot/config.json"
 if [ -f "$CFG" ]; then
   echo "[apply] existing config.json preserved at $CFG"
 else
   mkdir -p "$TARGET/.autopilot"
-  # Escape for JSON
-  json_escape() { python -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1" 2>/dev/null || printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
-  cat > "$CFG" <<EOF
-{
-  "project_name": $(json_escape "$NAME_ARG"),
-  "project_description": $(json_escape "$DESC_ARG"),
-  "product_directive": $(json_escape "$DIRECTIVE_ARG"),
-  "operator_language": $(json_escape "$LANG_ARG"),
-  "template_version": "$TEMPLATE_VERSION",
-  "autopilot_ai": "claude",
-  "next_delay_default": 900
+  python3 - "$CFG" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" "$PRD_ARG" "$RELAY_ARG" "$TEMPLATE_VERSION" <<'PY'
+import json, sys, pathlib
+path, name, desc, directive, lang, prd, relay, tpl_ver = sys.argv[1:]
+cfg = {
+    "project_name": name,
+    "project_description": desc,
+    "product_directive": directive,
+    "operator_language": lang,
+    "prd_path": prd,
+    "relay_repo_path": relay,
+    "search_roots": ["src","lib","tests","docs","Document","Assets/Scripts","Assets/Tests",".autopilot",".agents",".prompts","tools"],
+    "template_version": tpl_ver,
+    "autopilot_ai": "claude",
+    "next_delay_default": 900,
 }
-EOF
+pathlib.Path(path).write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding='utf-8')
+PY
   echo "[apply] wrote $CFG"
 fi
 
-# --- render PROMPT.md placeholders -----------------------------------------
+# --- render PROMPT.md placeholders ----------------------------------------
 PROMPT_PATH="$TARGET/.autopilot/PROMPT.md"
 if [ -f "$PROMPT_PATH" ]; then
-  python - "$PROMPT_PATH" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" <<'PY'
+  python3 - "$PROMPT_PATH" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" <<'PY'
 import sys, pathlib
 path, name, desc, directive, lang = sys.argv[1:]
 p = pathlib.Path(path)
@@ -148,21 +196,43 @@ PY
   echo "[apply] rendered placeholders in .autopilot/PROMPT.md"
 fi
 
-# --- locales dir inside target (copy only chosen + en fallback) ------------
+# --- render top-level agent MDs (UTF-8 with BOM) --------------------------
+for md in PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md; do
+  MD_PATH="$TARGET/$md"
+  if [ -f "$MD_PATH" ]; then
+    python3 - "$MD_PATH" "$NAME_ARG" "$DIRECTIVE_ARG" "$PRD_DISPLAY" "$RELAY_DISPLAY" "$LANG_ARG" "$GUARDRAILS_BLOCK" <<'PY'
+import sys, pathlib
+path, name, directive, prd, relay, lang, guardrails = sys.argv[1:]
+p = pathlib.Path(path)
+t = p.read_text(encoding='utf-8')
+t = t.replace('{{PROJECT_NAME}}', name)
+t = t.replace('{{PROJECT_DIRECTIVE}}', directive)
+t = t.replace('{{PRD_PATH}}', prd)
+t = t.replace('{{RELAY_REPO_PATH}}', relay)
+t = t.replace('{{OPERATOR_LANG}}', lang)
+t = t.replace('{{PROJECT_GUARDRAILS_BLOCK}}', guardrails)
+# Agent-facing Markdown must be UTF-8 with BOM (see PROJECT-RULES.md).
+p.write_bytes(b'\xef\xbb\xbf' + t.encode('utf-8'))
+PY
+    echo "[apply] rendered placeholders in $md"
+  fi
+done
+
+# --- locales dir inside target (copy only chosen + en fallback) -----------
 mkdir -p "$TARGET/.autopilot/locales/$LANG_ARG" "$TARGET/.autopilot/locales/en"
 cp "$WORK/template/locales/en/strings.json" "$TARGET/.autopilot/locales/en/strings.json" 2>/dev/null || true
 if [ -d "$WORK/template/locales/$LANG_ARG" ]; then
   cp "$WORK/template/locales/$LANG_ARG/strings.json" "$TARGET/.autopilot/locales/$LANG_ARG/strings.json" 2>/dev/null || true
 fi
 
-# --- hooks -----------------------------------------------------------------
+# --- hooks ----------------------------------------------------------------
 if [ -d "$TARGET/.autopilot/hooks" ]; then
   chmod +x "$TARGET/.autopilot/hooks/"*.sh "$TARGET/.autopilot/hooks/pre-commit" "$TARGET/.autopilot/hooks/commit-msg" 2>/dev/null || true
   git config core.hooksPath .autopilot/hooks
   echo "[apply] hooks registered"
 fi
 
-# --- cleanup ---------------------------------------------------------------
+# --- cleanup --------------------------------------------------------------
 [ "$conflict_count" -eq 0 ] && rmdir "$CONFLICTS" 2>/dev/null || true
 
 echo ""
@@ -180,9 +250,12 @@ cat <<HINT
 
 Language: $LANG_ARG
 Project:  $NAME_ARG
+PRD path: $PRD_DISPLAY
+Relay:    $RELAY_DISPLAY
 
 Next steps:
   1. Review .autopilot/config.json and .autopilot/BACKLOG.md (replace seed tasks).
-  2. git add .autopilot && git commit -m "chore: apply autopilot-dad-template"
-  3. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
+  2. Review PROJECT-RULES.md / CLAUDE.md / AGENTS.md at repo root and fill in project-specific guardrails.
+  3. git add .autopilot PROJECT-RULES.md DIALOGUE-PROTOCOL.md AGENTS.md CLAUDE.md RTK.md Document/ && git commit -m "chore: apply autopilot-dad-template"
+  4. First iter: paste .autopilot/RUN.claude-code.md into Claude Code desktop.
 HINT
