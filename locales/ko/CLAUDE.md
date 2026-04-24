@@ -1,3 +1,7 @@
+<!-- validate:ignore-refs: Document/.archive/, INDEX.md, .prompts/10-시스템-문서-정합성-동기화.md -->
+<!-- Archive subtree + archive INDEX.md + the optional 10-system-doc-sync prompt
+     are project-conditional; do not fail pre-commit in a fresh apply (round-3 F7). -->
+
 # Claude Code Contract — {{PROJECT_NAME}}
 
 **IMPORTANT: `PROJECT-RULES.md` 를 먼저 읽는다.** 모든 에이전트가 따라야 하는 공용 프로젝트 규칙이 담겨 있다.
@@ -13,7 +17,7 @@
 
 ## Agent identity ownership (Layer 1)
 
-에이전트 정체성(agent-identities, tool-policy allowlist, dialogue-checkpoint 규약)의 **권위 있는 소유자는 relay repo** `{{RELAY_REPO_PATH}}` 이다. 근거: `{{RELAY_REPO_PATH}}/Document/governance/5-layer-mapping.md` 의 Layer 1.
+에이전트 정체성(agent-identities, tool-policy allowlist, dialogue-checkpoint 규약)의 **권위 있는 소유자는 relay repo** `{{RELAY_REPO_PATH}}` 이다. 근거: `{{RELAY_REPO_PATH}}/Document/governance/5-layer-mapping.md` 의 Layer 1. <!-- validate:ignore-missing-ref -->
 
 - 이 repo 에 `.agents/identities/`, `agent-identities.json`, `tool-policy.json` 같은 shadow-identity 파일을 만들지 않는다. 식별자·허용 목록 원본은 relay repo 에만 존재해야 한다. <!-- validate:ignore-missing-ref -->
 - 식별자·도구 클래스 허용 목록을 바꿔야 하면 relay repo 에 PR 을 내고, 그 PR 이 머지된 후 이 프로젝트의 동작을 맞춘다.

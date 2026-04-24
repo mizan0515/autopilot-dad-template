@@ -1,4 +1,9 @@
-﻿# .prompts/ — Dual-Agent Dialogue v2 프롬프트
+﻿<!-- validate:ignore-refs: Document/.archive/harness-v1/, 00-공통-보충규칙.md, 01-정합성-감사수정.md, 02-전체-코드문서-감사.md, 03-도메인-감사-체크리스트.md, 04-버그수정.md, 05-데이터스키마-검증.md, 06-품질-일관성-보강.md, 07-기획-검증-수정.md, 08-플레이테스트-절차.md, 09-비상-세션-복구.md, 10-시스템-문서-정합성-동기화.md, 11-DAD-시스템-운영-감사.md -->
+<!-- The numbered split-prompt files (00-...11-) are optional companion prompts
+     a project may or may not author; ship a generic README that names them as
+     possibilities without demanding their existence (round-3 F7). -->
+
+# .prompts/ — Dual-Agent Dialogue v2 프롬프트
 
 ## 개요
 

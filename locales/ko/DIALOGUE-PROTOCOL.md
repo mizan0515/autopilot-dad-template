@@ -1,3 +1,7 @@
+<!-- validate:ignore-refs: Document/dialogue/packets/ -->
+<!-- `Document/dialogue/packets/` is a session-generated subdir that only
+     appears after a turn runs — not in a fresh apply (round-3 F7). -->
+
 # Dual-Agent Dialogue Protocol (DAD v2) — 루트 계약
 
 Codex와 Claude Code가 **대칭적 턴**으로 서로의 프롬프트를 생성하고, 각자 계획·실행·평가를 수행하며, Sprint Contract 기반으로 수렴하는 시스템.

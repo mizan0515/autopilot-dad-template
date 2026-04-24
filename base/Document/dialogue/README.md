@@ -1,3 +1,6 @@
+﻿<!-- validate:ignore-refs: tools/Write-DadDashboard.ps1 -->
+<!-- Optional dashboard writer; not shipped with every template apply (round-3 F7). -->
+
 # Document/dialogue/ — DAD v2 runtime directory
 
 This folder holds Dual-Agent Dialogue v2 **runtime artifacts** — not contract/schema definitions, but the state/packets/summaries/archives produced by actual sessions.

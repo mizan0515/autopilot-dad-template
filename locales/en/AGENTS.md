@@ -1,3 +1,7 @@
+<!-- validate:ignore-refs: PITFALLS.md, EVOLUTION.md, Assets/Scripts/, Assets/Tests/, Packages/ -->
+<!-- Project-conditional refs: `PITFALLS.md`/`EVOLUTION.md` are talked about
+     as file-kind nouns; Assets/ and Packages/ only exist in Unity projects. -->
+
 # Codex Agent Contract — {{PROJECT_NAME}}
 
 **IMPORTANT: Read `PROJECT-RULES.md` first.** It contains the shared project rules that all agents must follow.

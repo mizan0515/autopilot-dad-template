@@ -1,3 +1,7 @@
+<!-- validate:ignore-refs: Document/.archive/, INDEX.md, .prompts/10-system-doc-sync.md -->
+<!-- Project-conditional refs (archive tree, archive INDEX, optional
+     system-doc-sync companion prompt) — round-3 F7. -->
+
 # Claude Code Contract — {{PROJECT_NAME}}
 
 **IMPORTANT: Read `PROJECT-RULES.md` first.** It contains the shared project rules that all agents must follow.
@@ -13,7 +17,7 @@ Related files:
 
 ## Agent identity ownership (Layer 1)
 
-Authoritative ownership of agent identity (agent-identities, tool-policy allowlist, dialogue-checkpoint contract) lives in the **relay repo** at `{{RELAY_REPO_PATH}}`. Basis: `{{RELAY_REPO_PATH}}/Document/governance/5-layer-mapping.md` — Layer 1.
+Authoritative ownership of agent identity (agent-identities, tool-policy allowlist, dialogue-checkpoint contract) lives in the **relay repo** at `{{RELAY_REPO_PATH}}`. Basis: `{{RELAY_REPO_PATH}}/Document/governance/5-layer-mapping.md` — Layer 1. <!-- validate:ignore-missing-ref -->
 
 - Do not create shadow identity files (`.agents/identities/`, `agent-identities.json`, `tool-policy.json`) inside this repo. Identifier/allowlist canonical source lives only in the relay repo. <!-- validate:ignore-missing-ref -->
 - To change identifiers or tool-class allowlists, open a PR on the relay repo; once merged, align this project's behavior.

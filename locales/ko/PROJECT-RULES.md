@@ -1,3 +1,6 @@
+<!-- validate:ignore-refs: Document/.archive/, INDEX.md -->
+<!-- Archive subtree + archive INDEX.md are project-conditional (round-3 F7). -->
+
 # 공용 프로젝트 규칙 — {{PROJECT_NAME}}
 
 이 파일의 규칙은 **모든 에이전트**(Claude Code, Codex, DAD 피어, autopilot 러너)에게 적용된다.
