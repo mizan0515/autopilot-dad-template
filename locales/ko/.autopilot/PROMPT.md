@@ -96,6 +96,56 @@ iter 시작 직후:
 
 ---
 
+## 런타임 증거 신뢰 게이트
+
+`preflight.{ps1,sh}` 는 두 개의 훅을 분리해서 실행한다:
+- `hooks/preflight-verify.{ps1,sh}` — 정적 구성 점검. 여기서 실패하면 iter abort (`preflight-failed:verify-hook-failed`).
+- `hooks/preflight-runtime-bridge.{ps1,sh}` — 외부 도구 브리지 (Unity MCP, Claude Preview, DB 등) 가 실제로 응답하는지 확인하는 probe. 여기서 실패는 **soft** 로 취급되어 `FAILURES.jsonl` 에 `event=preflight-runtime-bridge, result=unresponsive` 로만 기록된다.
+
+이번 iter 에서 runtime-bridge probe 가 unresponsive 였다면:
+- 커밋 메시지 · PR 본문에 runtime evidence (스크린샷, play-mode QA, live DB 출력) 를 주장하지 않는다.
+- doc-only 작업, 스펙 동기화, 백로그 정리를 우선한다.
+- `HISTORY.md` 에 `runtime-bridge: unresponsive` 로 degraded 상태를 기록해 operator 대시보드가 드러낼 수 있게 한다.
+
+`doctor-green != live-runtime-green`. preflight 도달성은 필요조건이지 충분조건이 아니다. 브리지가 보고하는 project path 가 현재 iter 워크트리와 일치하는지도 확인할 것 — 장수 MCP 프로세스는 이전 워크트리에 pin 된 채로 남아있을 수 있다.
+
+---
+
+## 테스트 필터 0-match 가드
+
+focused test filter (`dotnet test --filter`, `pytest -k`, `jest --testNamePattern` 등) 를 쓰는 검증 단계는 반드시 두 가지를 assert 한다:
+1. 러너가 `matched_count > 0` 를 보고했는가.
+2. 실제 실행된 집합이 요청한 집합과 동일한가.
+
+빈 필터 결과에 green exit 은 흔한 silent failure 다 — 필터 오탈자가 all-green 으로 읽힌다. 필터가 0 매치면 iter 를 실패 처리하고 METRICS 에 `test-filter-zero` 로 기록.
+
+---
+
+## 예산 self-calibration
+
+`budget_exceeded` 가 최근 iter 의 25 % 이상에서 발생하면 soft cap 이 더 이상 신호를 갖지 않는다. iter 20 이후 idle-upkeep 턴에서 mutable 한 `files_read` / `bash_calls` soft cap 을 `METRICS.jsonl` 의 관찰된 p75 (적절한 수로 반올림) 로 재조정할 수 있다. METRICS 에 `budget_recalibrated: {files_read: N, bash_calls: M}` 를 남긴다. `budget_exceeded` 는 원래 설계대로 드물고 큰 신호로 유지. IMMUTABLE budget 엔트리는 이 방식으로 바꿀 수 없다 — self-evolution + operator 승인 필요.
+
+---
+
+## incident → backlog admission
+
+iter 가 재발 방지할 가치가 있는 실패 클래스를 관찰하면 다음 BACKLOG 엔트리에 `[incident]`, `[pitfall]`, `[retrospective]` 태그를 붙인다:
+- `[incident]` — 실제 production 실패 (survivor branch, 데이터 유실, 깨진 PR)
+- `[pitfall]` — 재발할 near-miss 나 friction (인코딩 drift, 프로세스 launch 기행)
+- `[retrospective]` — 특정 실패에 엮이지 않은 operator 발단 리뷰
+
+idle-upkeep 과 brainstorm 패스는 일반 `[ux]` / `[content]` / `[dx]` 항목보다 이 태그들을 우선한다. 증거 포인터 (`INCIDENTS.md#section` 또는 `PITFALLS.md#entry`) 를 백로그 라인에 같이 남긴다.
+
+---
+
+## 셸 / write 규율
+
+- 공백 포함 경로가 들어갈 수 있는 subprocess launch 는 `base/tools/Start-Process-Safe.ps1` (또는 `.sh` peer) 를 사용한다. raw `Start-Process -ArgumentList @('-x','C:\Path With Space')` 는 조용히 잘린다.
+- machine-read JSON / JSONL (METRICS, qa-evidence, RUNNER-LIVE, dispatch report) 는 `base/tools/Write-Utf8NoBom.ps1` / `.sh` 를 사용한다. PowerShell 기본 `Out-File` 은 UTF-16-LE + BOM 이라 비 ASCII 를 깨뜨린 이력이 있다. agent-facing `.md` 는 validator 계약대로 UTF-8 BOM 을 유지.
+- 로컬라이즈 카피가 있는 파일에 광범위 `replace_all` · `sed -i` 금지. 주변 맥락이 있는 line-targeted 편집만.
+
+---
+
 ## 유휴 정비 (idle-upkeep)
 
 Active task 가 없고 BACKLOG 상위가 비어 있으면 이번 iter 는 정비 턴으로 전환:
