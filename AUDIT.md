@@ -1,6 +1,6 @@
-# AUDIT — 17-row incident-prevention matrix
+# AUDIT — 43-row incident-prevention matrix
 
-Phase 7 final audit. Cross-references each incident pattern from `card-climber/.autopilot/INCIDENTS.md` (§1–§3) against the template's current safeguards.
+Phase 7 first-pass audit (rows 1–17) covered the silent-stall chain from `card-climber/.autopilot/INCIDENTS.md` §1–§3. Phases 8–10 (round-2 audit) extended the matrix with 26 more rows drawn from `D:\Unity\card game\.autopilot\PITFALLS.md` and `D:\cardgame-dad-relay\.autopilot\PITFALLS.md` + governance docs.
 
 | # | Incident pattern | Template safeguard | Source PR | Status |
 |---|---|---|---|---|
@@ -22,9 +22,42 @@ Phase 7 final audit. Cross-references each incident pattern from `card-climber/.
 | 16 | Relay rotation token-counter reset | Relay-side fix (not template scope) | — | N/A (relay) |
 | 17 | Per-iter worktree disk saturation | `relay/SETUP.md` documents reusable worktree convention (`<leaf>-autopilot-runner/live` via `AUTOPILOT_WORKTREE_DIR`) + `git worktree prune` cleanup; `base/.autopilot/runners/runner.ps1` already implements the reuse | Phase 7 | ✅ covered |
 
+## Round-2 extension — runtime discipline + relay robustness (rows 18–43)
+
+Sourced from the audit of `D:\Unity\card game` + `D:\cardgame-dad-relay` after phases 1–7 closed. Split across three PRs.
+
+| # | Incident pattern | Template safeguard | Source PR | Status |
+|---|---|---|---|---|
+| 18 | Broad regex/replace_all on localized strings corrupts neighbors | `locales/{en,ko}/.autopilot/PITFALLS.md` seed entry; `PROMPT.md` shell-discipline section | Phase 8 (#13) | ✅ covered (doc) |
+| 19 | `doctor green` ≠ live-runtime-green | `preflight.{ps1,sh}` adds separate `preflight-runtime-bridge` hook slot (soft-fail, distinct from hard-fail verify-hook); `PROMPT.md` runtime-evidence trust gate | Phase 8 (#13) | ✅ covered |
+| 20 | Worktree-bridge drift (long-lived MCP pinned to old worktree) | `PROMPT.md` runtime-evidence gate mandates bridge-reported-path == iter worktree check | Phase 8 (#13) | ✅ covered (doc) |
+| 21 | PowerShell `Start-Process` spaced-arg truncation | `base/tools/Start-Process-Safe.ps1` wrapper + PITFALLS seed | Phase 8 (#13) | ✅ covered |
+| 22 | Subprocess launched-at-shell ≠ process materialized | same `Start-Process-Safe.ps1` polls PID for N seconds + PITFALLS seed | Phase 8 (#13) | ✅ covered |
+| 23 | PowerShell UTF-16-BOM corruption of runtime JSON / QA evidence | `base/tools/Write-Utf8NoBom.ps1` + `write-utf8-nobom.sh` + PITFALLS seed + `PROMPT.md` shell-discipline | Phase 8 (#13) | ✅ covered |
+| 24 | Stale bg-job collision across iters | PITFALLS seed; `preflight-runtime-bridge` hook slot is the drain-point | Phase 8 (#13) | ✅ covered (doc + slot) |
+| 25 | `gh pr merge --delete-branch` unreliable with worktree pinning | PITFALLS seed instructs `git worktree remove` → merge → `fetch --prune` order; stale-PR sweep (row 10) covers the cleanup | Phase 8 (#13) | ✅ covered (doc) |
+| 26 | Post-merge branch-delete scope ambiguity | PITFALLS seed: only auto-delete branches created in the current iter; pre-existing `[gone]` reported to METRICS as cleanup debt | Phase 8 (#13) | ✅ covered (doc) |
+| 27 | Focused test-filter silently returns 0 matches | `PROMPT.md` test-filter zero-match guard — fail iter + METRICS `test-filter-zero` | Phase 8 (#13) | ✅ covered |
+| 28 | `budget_exceeded` signal saturation | `PROMPT.md` budget self-calibration protocol (p75 recalibration after iter 20; IMMUTABLE caps untouched) | Phase 8 (#13) | ✅ covered |
+| 29 | Incident→backlog admission not practiced | `PROMPT.md` `[incident]`/`[pitfall]`/`[retrospective]` admission tags, prioritized in idle-upkeep/brainstorm | Phase 8 (#13) | ✅ covered (doc) |
+| 30 | Rotation infinite loop on lifetime cumulative counter | `broker.myproject.json` `_notes` mandates segment-scoped `OutputTokensAtLastRotation`; `relay/SETUP.md` Troubleshooting #1 | Phase 9 (#14) | ✅ covered (contract) |
+| 31 | Rotation leaves non-active peer's native session handle (C2 violation) | `broker.myproject.json` `_notes` + `relay/SETUP.md` Troubleshooting #2 (C1/C2/C3 contract checklist) | Phase 9 (#14) | ✅ covered (contract) |
+| 32 | Silent artifact-write failure swallowed | `relay/SETUP.md` Troubleshooting #3 mandates exit=5 + `artifact_write_failures` population; `--working-dir` hygiene | Phase 9 (#14) | ✅ covered (contract) |
+| 33 | Convergence rejected when no Sprint Contract issued (small-scope) | `relay/SETUP.md` Troubleshooting #4; `DIALOGUE-PROTOCOL.md` already encodes small-scope Contract-optional | Phase 9 (#14) | ✅ covered |
+| 34 | Live-path not verified by `dotnet build` alone | `relay/SETUP.md` required `ccrelay-run --probe-only` smoke before task dispatch | Phase 9 (#14) | ✅ covered |
+| 35 | Peer asymmetry via `if agent == "codex"` role-conditional branches | `DIALOGUE-PROTOCOL.md` Protocol Invariants #1 (IMMUTABLE:mission violation); `relay/SETUP.md` Troubleshooting #6 lint guidance | Phase 9 (#14) | ✅ covered |
+| 36 | `final_no_handoff` with populated `next_task` (migration hazard) | `DIALOGUE-PROTOCOL.md` Protocol Invariants #2 | Phase 9 (#14) | ✅ covered |
+| 37 | `recovery_resume` misuse to skip handoffs | `DIALOGUE-PROTOCOL.md` Protocol Invariants #3 (requires `confidence:low` + ≥1 `open_risks`) | Phase 9 (#14) | ✅ covered |
+| 38 | MCP correlation in audit log falsely assumed present | `DIALOGUE-PROTOCOL.md` Protocol Invariants #4 documents this as explicit non-feature | Phase 9 (#14) | ✅ covered (doc) |
+| 39 | METRICS.jsonl schema drift (missing `ts`, collision with Tier-3) | `DIALOGUE-PROTOCOL.md` Protocol Invariants #5; `base/tools/Validate-Metrics.ps1` enforces Tier-1 + `<project>_` prefix | Phase 9 (#14) | ✅ covered |
+| 40 | `handoff.context` unbounded → token bloat cross-turn | `broker.myproject.json` `carryForwardMaxBytes: 2048` (was missing); mirrored from DIALOGUE-PROTOCOL cap | Phase 9 (#14) | ✅ covered |
+| 41 | Broker cap values unsafe as shipped defaults | `broker.myproject.json` tuned: `maxCumulativeOutputTokens=30000`, `maxTurnsPerSession=12`, `maxSessionDuration=00:30:00`, `perTurnTimeout=00:10:00`, `cacheReadRatioFloor=0.25`, `consecutiveLowCacheTurnsThreshold=2` | Phase 9 (#14) | ✅ covered |
+| 42 | PROMPT boot cost dominates maintenance iters | `locales/{en,ko}/.autopilot/PROMPT.lite.md` + `AUTOPILOT_PROMPT_RELATIVE` switch protocol in `PROMPT.md` prompt-economy section | Phase 10 (#15) | ✅ covered |
+| 43 | Relay-autopilot vs project-autopilot confusion | `relay/SETUP.md` "Relay autopilot vs project autopilot" isolation note | Phase 9 (#14) | ✅ covered (doc) |
+
 ## Interpretation
 
-**15 of 17 rows have concrete safeguards** inside the template. The two exceptions:
+**41 of 43 rows have concrete safeguards** inside the template. The two remaining exceptions:
 
 - **Row 7 (MCP EditMode filter):** genuinely project-specific — Unity MCP quirks have no place in an engine-agnostic template. Left as a documented known-issue.
 - **Row 16 (relay token counter):** lives in the relay repo, not here. The template's `relay/SETUP.md` points at the relay as Layer 1 owner; that's where the fix belongs.
