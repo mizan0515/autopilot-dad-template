@@ -1,3 +1,6 @@
+<!-- validate:ignore-refs: Document/.archive/, INDEX.md -->
+<!-- Archive tree + archive INDEX.md are project-conditional (round-3 F7). -->
+
 # Shared Project Rules — {{PROJECT_NAME}}
 
 This file contains rules that apply to **all agents** (Claude Code, Codex, DAD peers, autopilot runner).

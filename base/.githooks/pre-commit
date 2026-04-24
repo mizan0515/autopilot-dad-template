@@ -22,3 +22,4 @@ fi
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisions.ps1 -Root .
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisionWorkflow.ps1 -Root .
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-DadPacket.ps1 -Root . -AllSessions
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-ImmutableBlocks.ps1 -Root .

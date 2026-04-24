@@ -1,3 +1,9 @@
+<!-- validate:ignore-refs: PITFALLS.md, EVOLUTION.md, Assets/Scripts/, Assets/Tests/, Packages/ -->
+<!-- The refs above are project-conditional: `PITFALLS.md`/`EVOLUTION.md` are
+     talked about as file-kind nouns; `Assets/Scripts/`/`Assets/Tests/`/`Packages/`
+     only exist in Unity projects. The template must still apply cleanly to
+     web/CLI/library repos (round-3 F7). -->
+
 # Codex Agent Contract — {{PROJECT_NAME}}
 
 **IMPORTANT: `PROJECT-RULES.md` 를 먼저 읽는다.** 모든 에이전트가 따라야 하는 공용 프로젝트 규칙이 담겨 있다.

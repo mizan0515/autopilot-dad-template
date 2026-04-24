@@ -1,3 +1,6 @@
+<!-- validate:ignore-refs: Document/dialogue/packets/ -->
+<!-- Session-generated subdir; does not exist in a fresh apply (round-3 F7). -->
+
 # Dual-Agent Dialogue Protocol (DAD v2) — Root Contract
 
 Codex and Claude Code collaborate in **symmetric turns**: each agent plans, executes, and evaluates every turn, converging on a Sprint Contract.

@@ -536,6 +536,19 @@ if (-not (Test-Path $rootStatePath)) {
 $state = Get-Content -Path $rootStatePath -Raw -Encoding UTF8 | ConvertFrom-Json
 $statePath = $rootStatePath
 
+# Round-3 F11: bootstrap skip — the shipped-template state.json has
+# session_status='none' and a null session_id before any DAD session has
+# been created. With no packets and no session-state files it is a clean
+# pre-session state, not an invalid one. Without this guard the very first
+# `chore: apply autopilot-dad-template` commit fails pre-commit on "root
+# state.json is missing session_id" even though the file is in its shipped
+# default shape.
+if (($state.session_status -eq "none" -or [string]::IsNullOrWhiteSpace([string]$state.session_id)) -and
+    ($packetFiles.Count -eq 0) -and ($sessionStateFiles.Count -eq 0) -and (-not $SessionId)) {
+    Write-Host "No live DAD sessions yet (session_status=none). Packet validation skipped."
+    return
+}
+
 # valid intermediate state: session created but no turns yet
 if ($state.session_status -eq "active" -and $state.current_turn -eq 0 -and (-not $state.packets -or @($state.packets).Count -eq 0)) {
     if ((-not $SessionId) -and ($packetFiles.Count -eq 0)) {

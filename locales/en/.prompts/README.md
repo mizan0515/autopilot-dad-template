@@ -1,3 +1,6 @@
+<!-- validate:ignore-refs: Document/.archive/harness-v1/, 00-session-operating-rules.md, 01-integrity-checklist.md, 02-full-code-doc-set.md, 03-mode4-overtime-alignment.md, 04-map-fallback.md, 05-ui-wireframe-sync.md, 06-post-system-reflection-checklist.md, 07-dialogue-session-cleanup.md, 08-new-feature-plan-template.md, 09-error-analysis-summary.md, 10-system-doc-sync.md, 11-auto-convergence-rehearsal.md -->
+<!-- Numbered split-prompt companion files are optional per project. -->
+
 # .prompts/ — Dual-Agent Dialogue v2 prompts
 
 ## Overview
