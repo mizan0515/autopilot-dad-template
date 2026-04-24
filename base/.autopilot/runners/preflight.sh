@@ -8,9 +8,16 @@ set -uo pipefail
 AUTOPILOT_ROOT="${1:-}"
 AI="${2:-codex}"
 
+# Default to <pwd>/.autopilot when invoked manually from the project root,
+# matching preflight.ps1's behaviour (round-3 dogfood F3).
 if [ -z "$AUTOPILOT_ROOT" ]; then
-  echo "usage: preflight.sh <AutopilotRoot> [ai]" >&2
-  exit 2
+  if [ -d "$PWD/.autopilot" ]; then
+    AUTOPILOT_ROOT="$PWD/.autopilot"
+  else
+    echo "usage: preflight.sh <AutopilotRoot> [ai]" >&2
+    echo "  (run from project root or pass an explicit path)" >&2
+    exit 2
+  fi
 fi
 
 FAILURES="$AUTOPILOT_ROOT/FAILURES.jsonl"
@@ -90,6 +97,21 @@ fi
 if [ "${#problems[@]}" -gt 0 ]; then
   reason="$(IFS=, ; echo "${problems[*]}")"
   echo "[preflight] FAILED: $reason" >&2
+  # Friendly hints for the most common bootstrap-time failures (round-3 F4).
+  for p in "${problems[@]}"; do
+    case "$p" in
+      git-no-origin)
+        echo "  hint: this project has no GitHub remote yet. Create one with:" >&2
+        echo "    gh repo create <owner>/<name> --source=. --remote=origin --private --push" >&2
+        echo "  or, if the repo already exists on GitHub:" >&2
+        echo "    git remote add origin https://github.com/<owner>/<name>.git && git push -u origin main" >&2
+        ;;
+      gh-not-installed) echo "  hint: install GitHub CLI from https://cli.github.com/ then run 'gh auth login'." >&2 ;;
+      gh-not-authed)    echo "  hint: run 'gh auth login' and choose GitHub.com + HTTPS + browser." >&2 ;;
+      ai-cli-missing*)  echo "  hint: see docs/cli-login-guide.md for installing claude/codex CLI." >&2 ;;
+      no-prompt-md)     echo "  hint: re-run apply.sh — .autopilot/PROMPT.md is missing." >&2 ;;
+    esac
+  done
   write_failure "event=preflight" "result=failed" "reason=$reason" "ai=$AI"
   echo "preflight-failed:$reason"
   exit 1
