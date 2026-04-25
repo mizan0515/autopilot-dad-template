@@ -65,11 +65,19 @@ if (-not $Ai) {
 
 $failuresPath = Join-Path $AutopilotRoot 'FAILURES.jsonl'
 
+# Round-3 F31: same BOM-safe pattern as F30 (#49) — `-Encoding utf8` on
+# Windows PowerShell 5.1 prepends a UTF-8 BOM to byte 0 of FAILURES.jsonl,
+# breaking jq per-line parsing. F30 patched runner.ps1 + stalled-fallback.ps1
+# but missed this preflight write. Use [IO.File]::AppendAllText with explicit
+# UTF8Encoding($false) for cross-version safety.
+$preflightUtf8NoBom = New-Object System.Text.UTF8Encoding $false
+
 function Write-FailureLine {
   param([hashtable]$Row)
   try {
     $Row['ts'] = (Get-Date).ToString('o')
-    ($Row | ConvertTo-Json -Compress -Depth 6) | Add-Content -Path $failuresPath -Encoding utf8
+    $line = ($Row | ConvertTo-Json -Compress -Depth 6) + "`n"
+    [System.IO.File]::AppendAllText($failuresPath, $line, $preflightUtf8NoBom)
   } catch { }
 }
 
