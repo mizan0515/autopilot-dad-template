@@ -64,9 +64,22 @@ function Write-RunnerState {
   # runner just wrote to RUNNER-LIVE.json IS what `status` reads, so the
   # extra args were redundant anyway. Now call just `status` and capture
   # stderr for diagnostics if it fails.
-  $statusOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $projectScript status 2>&1
-  if ($LASTEXITCODE -ne 0) {
-    Write-Warning "[autopilot] dashboard refresh failed (exit=$LASTEXITCODE): $($statusOut -join '; ')"
+  #
+  # Round-3 F36: previously hardcoded `& powershell ...` (Windows PowerShell
+  # 5.1 binary), which doesn't exist on macOS/Linux pwsh hosts. The runner
+  # itself can be invoked via pwsh on POSIX (e.g. on a developer Mac running
+  # the loop), but the dashboard refresh would then throw "powershell:
+  # command not found". Mirror runner.sh's pwsh-then-powershell resolver.
+  $statusRunner = if (Get-Command pwsh -ErrorAction SilentlyContinue) { 'pwsh' }
+                  elseif (Get-Command powershell -ErrorAction SilentlyContinue) { 'powershell' }
+                  else { $null }
+  if ($statusRunner) {
+    $statusOut = & $statusRunner -NoProfile -ExecutionPolicy Bypass -File $projectScript status 2>&1
+    if ($LASTEXITCODE -ne 0) {
+      Write-Warning "[autopilot] dashboard refresh failed (exit=$LASTEXITCODE): $($statusOut -join '; ')"
+    }
+  } else {
+    Write-Warning "[autopilot] dashboard refresh skipped: neither pwsh nor powershell on PATH"
   }
 }
 
