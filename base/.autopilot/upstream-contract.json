@@ -1,102 +1,107 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-04-25T10:18:30.5796170Z",
+  "generated_at": "2026-04-25T11:01:42.5542040Z",
   "template_repo": "mizan0515/autopilot-dad-template",
   "validators": {
+    "Validate-DadPacket.ps1": {
+      "sha256": "921ea2e59bc00cc79268ddfea85998f927bf46a31e86117b29877b6ee49de914",
+      "line_count": 722,
+      "byte_size": 29980
+    },
     "Validate-LongYellowState.ps1": {
       "sha256": "bb61f0790e1fc449c246ceae8d61563f6c45d2ff77f5dc38b65a23faf85400fa",
       "line_count": 252,
       "byte_size": 9297
-    },
-    "Validate-Metrics.ps1": {
-      "sha256": "bd7b661c30349790ba9bde4c2aed912c0362ea5fc17b84ccc56a92f9acd3bce3",
-      "line_count": 257,
-      "byte_size": 10989
-    },
-    "Validate-CodexSkillMetadata.ps1": {
-      "sha256": "c9c6e67146454a50182c2acdd50510071e70863019aa7d342ee6d3d62b7b90f1",
-      "line_count": 28,
-      "byte_size": 781
-    },
-    "Validate-DadReportConsumption.ps1": {
-      "sha256": "8a7a72e664f1d65577111a3393825cb75b9f145c2363dad6cd9b9ea60f08487c",
-      "line_count": 219,
-      "byte_size": 8413
-    },
-    "Validate-FailuresLogged.ps1": {
-      "sha256": "dc008af5e9d3e688c1a77b3398b4e86273b0d3cd054b99102844d8f40a45b39d",
-      "line_count": 169,
-      "byte_size": 6615
-    },
-    "Validate-RuntimeEvidence.ps1": {
-      "sha256": "d4f1173003320378828ec90149e645a3ee05d3675ad56f7c876fa9793ff2bb72",
-      "line_count": 221,
-      "byte_size": 8925
-    },
-    "Validate-DoctorEmissions.ps1": {
-      "sha256": "497928e0ee0ec52a876ddbfef824e76ee23f1f42f47c3b1ed6d8d686a85033fa",
-      "line_count": 225,
-      "byte_size": 8920
-    },
-    "Validate-TokenEconomy.ps1": {
-      "sha256": "f42927e7dd56aa59525d127533d8ffdc8de6584fbdf30117d1d9f9f162a97c09",
-      "line_count": 273,
-      "byte_size": 12580
     },
     "Validate-HistoryInvariants.ps1": {
       "sha256": "606cd6381261ed2b7874383306fc4cff7d41ab41aa38e8c904172582d41091a2",
       "line_count": 223,
       "byte_size": 7981
     },
-    "Validate-Documents.ps1": {
-      "sha256": "cfe85cb9553901726280bc06a724553d4bb3d9cea6614a4074f8951611fbb182",
-      "line_count": 476,
-      "byte_size": 16876
+    "Validate-StaleStateDetection.ps1": {
+      "sha256": "62a90793bc9b22860d720c3a0e183041de89407a8ef8678c0b77dbbfc1152750",
+      "line_count": 203,
+      "byte_size": 7897
+    },
+    "Validate-DoctorEmissions.ps1": {
+      "sha256": "fe1e24cd0aa93ab507ca5a37df4d5583c7462b77176c3b9cf3ef55615a5e2e76",
+      "line_count": 236,
+      "byte_size": 9446
     },
     "Validate-ConfigToolingDrift.ps1": {
       "sha256": "c3dd62da397106ded37fd8ca11a6b80c42e0e9c029b0108c9298f910186c2de9",
       "line_count": 279,
       "byte_size": 10405
     },
-    "Validate-UpstreamContract.ps1": {
-      "sha256": "34242636963df0a5e35810ec1e6a42f992038afc5de07dab60b680cb1a9222a1",
-      "line_count": 269,
-      "byte_size": 10979
+    "Validate-DadDecisions.ps1": {
+      "sha256": "a3703a472d6665bd7504a774e2e656c0b4d4c9d885e6b62ba93e7a0bfafbd810",
+      "line_count": 99,
+      "byte_size": 2930
     },
-    "Validate-DadPacket.ps1": {
-      "sha256": "921ea2e59bc00cc79268ddfea85998f927bf46a31e86117b29877b6ee49de914",
-      "line_count": 722,
-      "byte_size": 29980
+    "Validate-FailuresLogged.ps1": {
+      "sha256": "dc008af5e9d3e688c1a77b3398b4e86273b0d3cd054b99102844d8f40a45b39d",
+      "line_count": 169,
+      "byte_size": 6615
     },
-    "Validate-StateTimestamp.ps1": {
-      "sha256": "445951d9d65eac0186c5b6e3568e7bbaa1fd28e3b7a956e0847e655703e7b12a",
-      "line_count": 221,
-      "byte_size": 8536
+    "Validate-PrLanguage.ps1": {
+      "sha256": "04ce6651b1f221a2cdc5848636e15ee042534f1aece17749b7b0c03c0960e038",
+      "line_count": 223,
+      "byte_size": 7707
+    },
+    "Validate-TokenEconomy.ps1": {
+      "sha256": "f42927e7dd56aa59525d127533d8ffdc8de6584fbdf30117d1d9f9f162a97c09",
+      "line_count": 273,
+      "byte_size": 12580
     },
     "Validate-ImmutableBlocks.ps1": {
       "sha256": "7582be6f9b71ad445067200357753fb40bd22eafc8d4a3a05da95f45cfa3d2e0",
       "line_count": 138,
       "byte_size": 5415
     },
-    "Validate-StaleStateDetection.ps1": {
-      "sha256": "62a90793bc9b22860d720c3a0e183041de89407a8ef8678c0b77dbbfc1152750",
-      "line_count": 203,
-      "byte_size": 7897
+    "Validate-Documents.ps1": {
+      "sha256": "cfe85cb9553901726280bc06a724553d4bb3d9cea6614a4074f8951611fbb182",
+      "line_count": 476,
+      "byte_size": 16876
+    },
+    "Validate-UpstreamContract.ps1": {
+      "sha256": "34242636963df0a5e35810ec1e6a42f992038afc5de07dab60b680cb1a9222a1",
+      "line_count": 269,
+      "byte_size": 10979
     },
     "Validate-DadDecisionWorkflow.ps1": {
       "sha256": "5ae027fc2e63629245cf38dccdbdf84dd6b9e0276cd05e8a78cc00559b5fc414",
       "line_count": 52,
       "byte_size": 1795
     },
-    "Validate-DadDecisions.ps1": {
-      "sha256": "a3703a472d6665bd7504a774e2e656c0b4d4c9d885e6b62ba93e7a0bfafbd810",
-      "line_count": 99,
-      "byte_size": 2930
+    "Validate-RuntimeEvidence.ps1": {
+      "sha256": "d4f1173003320378828ec90149e645a3ee05d3675ad56f7c876fa9793ff2bb72",
+      "line_count": 221,
+      "byte_size": 8925
+    },
+    "Validate-StateTimestamp.ps1": {
+      "sha256": "445951d9d65eac0186c5b6e3568e7bbaa1fd28e3b7a956e0847e655703e7b12a",
+      "line_count": 221,
+      "byte_size": 8536
     },
     "Validate-LedgerConsistency.ps1": {
       "sha256": "97b7996415a5e0f83df6abb038de6789b51468df5f8dfdacae7cb3d2c7282c69",
       "line_count": 222,
       "byte_size": 8327
+    },
+    "Validate-DadReportConsumption.ps1": {
+      "sha256": "8a7a72e664f1d65577111a3393825cb75b9f145c2363dad6cd9b9ea60f08487c",
+      "line_count": 219,
+      "byte_size": 8413
+    },
+    "Validate-CodexSkillMetadata.ps1": {
+      "sha256": "c9c6e67146454a50182c2acdd50510071e70863019aa7d342ee6d3d62b7b90f1",
+      "line_count": 28,
+      "byte_size": 781
+    },
+    "Validate-Metrics.ps1": {
+      "sha256": "bd7b661c30349790ba9bde4c2aed912c0362ea5fc17b84ccc56a92f9acd3bce3",
+      "line_count": 257,
+      "byte_size": 10989
     }
   }
 }
