@@ -151,7 +151,7 @@ Consumption means one of:
 1. Quote the report's `session_id` or file basename explicitly in STATE.md Recent Context or a HISTORY.md entry, and record how it will be handled (or why it's safe to ignore).
 2. If the report is no longer actionable (e.g., superseded by a newer report), move it to `.autopilot/consumed/` along with a `consumed-{ts}.json` metadata file.
 
-Operator-reported real failure (round-4): Unity-card-game's relay had already flagged `unity_mcp_observed` missing in its generated dashboard with `overall_status: governance_blocked`, but Unity-side autopilot **never consumed** that signal for 15+ hours. The relay knew the answer; the consumption loop was broken. F41 closes that gap.
+Real-world failure pattern (round-4): cases were reported where the relay had already flagged signals like `governance_blocked` / `missing-evidence` in its generated dashboard, but the autopilot side **never consumed** those signals for 15+ hours and kept shipping product work on top of the broken state. The relay knew the answer; the consumption loop was broken. F41 closes that gap.
 
 `tools/Validate-DadReportConsumption.ps1` enforces — unconsumed needs-attention reports trigger a same-run_id FAILURES row and drift report. Soft mode warns; future hard mode will force a recovery iter.
 
@@ -177,7 +177,7 @@ Every other outcome (`excluded`, `blocked`, `escalated`, `partial`, `deferred`, 
 
 The `event` field should be specific — `outcome-non-clean` is the fallback; prefer domain events like `runtime-bridge-unresponsive`, `ledger-drift-detected`, `peer-handoff-failed`, `evidence-missing`. The `reason` should be a single line the operator can read and immediately understand.
 
-Operator-reported real failure (round-4): Unity-card-game's `FAILURES.jsonl` was **empty** — even though the runner had been stuck at `retained-dirty` for 15 hours, draft PR #292 was languishing, and Unity-MCP went unobserved across 9 PRs. Real failures existed; they just weren't being written to the structured ledger, so downstream tools had nothing to triage. F40 closes that gap.
+Real-world failure pattern (round-4): cases were reported where multiple operational failures were happening simultaneously (runner stuck at `retained-dirty` for many hours, draft PRs languishing, external runtime bridges unobserved across many PRs) yet `FAILURES.jsonl` was **empty**. Failures existed; they just weren't being written to the structured ledger, so downstream tools had nothing to triage. F40 closes that gap.
 
 `tools/Validate-FailuresLogged.ps1` enforces this contract — when the most recent METRICS row's outcome is non-clean and no FAILURES row shares its run_id, drift is reported.
 
@@ -209,7 +209,7 @@ Field meanings (deliberately generic — fill with whatever your project produce
 
 **Project-specific tag extension**: Game projects wanting `[playmode]`/`[scene]`/`[battle]` triggers, or web projects wanting `[browser]`/`[a11y]`, add their own tags via `.autopilot/config.json` `"runtime_evidence_tags": ["[playmode]","[scene]"]`. The validator merges them with the default set.
 
-Operator-reported real failure (Unity-card-game, the original motivation): 9 PRs were merged labeled UX-visible without any runtime capture. STATE/HISTORY repeatedly logged "MCP가 없어서 fresh QA 스크린샷 없음" — but the real cause wasn't MCP absence; **no gate demanded the evidence at all**. This section is the agent-side contract; `tools/Validate-RuntimeEvidence.ps1` enforces it.
+Real-world failure pattern (round-4's original motivation): 9+ PRs labeled UX-visible were merged without any runtime capture. STATE/HISTORY repeatedly logged self-excusing notes like "no external bridge so no evidence." The real cause wasn't external-bridge absence; **no gate demanded the evidence at all**. External bridges differ by project shape — Unity MCP, Claude Preview, Selenium, Playwright, device simulators, DB instances, etc. This section is the agent-side contract; `tools/Validate-RuntimeEvidence.ps1` enforces it.
 
 Iters whose tags are doc-only (`[doc-only]`, `[bootstrap]`, `[idle-upkeep]`) can omit `runtime_evidence` — this gate is tag-driven.
 

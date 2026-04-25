@@ -12,7 +12,7 @@
 ## 시드 — 런타임 / 셸 지뢰 (다른 오토파일럿 루프에서 이미 관찰됨)
 
 - **로컬라이즈 문자열에 광범위 regex 금지.** CJK · 액센트가 포함된 `.md`/`.json`/`.yaml` 파일 편집은 line-targeted (주변 맥락을 `old_string` 에 포함) 로만 한다. `sed -i s/X/Y/g` 나 여러 파일에 걸친 `Edit replace_all=true` 는 이미 다른 프로젝트에서 이웃 불릿을 조용히 깨뜨린 적 있다.
-- **`doctor green` ≠ live-runtime-green.** preflight 가 exit 0 이어도 그건 바이너리가 "닿는다" 는 증거지 "응답한다" 는 증거가 아니다. 외부 브리지 (Unity MCP, Claude Preview, DB 등) 는 별도의 `preflight-runtime-bridge` 훅에서 실제 1-call health ping 을 쏘고 응답을 확인해야 하며, runtime-evidence 주장은 그 훅 exit 에 걸어야 한다.
+- **`doctor green` ≠ live-runtime-green.** preflight 가 exit 0 이어도 그건 바이너리가 "닿는다" 는 증거지 "응답한다" 는 증거가 아니다. 외부 브리지 (HTTP 백엔드 / DB / 메시지 큐 / Selenium · Playwright / 디바이스 시뮬레이터 / Unity MCP / Claude Preview / 게임 엔진 MCP 등 — 프로젝트 형태마다 다르다) 는 별도의 `preflight-runtime-bridge` 훅에서 실제 1-call health ping 을 쏘고 응답을 확인해야 하며, runtime-evidence 주장은 그 훅 exit 에 걸어야 한다.
 - **워크트리-브리지 drift.** MCP 서버 · IDE 같은 장수 외부 도구는 이전 iter 의 워크트리 경로에 고정되어 있을 수 있다. 러너가 `<leaf>-autopilot-runner/live` 를 재사용해도 브리지는 여전히 옛 경로에 대해 말하고 있을 수 있다. 브리지가 보고하는 project path 가 현재 iter 워크트리와 일치하는지 먼저 확인한 뒤에만 그 출력을 신뢰한다.
 - **PowerShell `Start-Process` 의 공백 포함 경로 인자 조용히 잘림.** `Start-Process foo.exe -ArgumentList "-projectPath","C:\My Path"` 는 공백 이후를 잘라먹는다. 반드시 단일 문자열로, 공백 토큰은 명시적 따옴표로 감싸서 전달한다. `base/tools/Start-Process-Safe.ps1` 를 래퍼로 쓴다.
 - **subprocess 가 셸에서 launched 됐다는 것은 프로세스가 materialize 됐다는 뜻이 아니다.** `Start-Process` exit code 0 만으로는 타깃 프로세스가 살아있다는 보장이 없다. N 초 동안 process list 를 폴링해서 PID 가 등장하지 않으면 iter 를 실패 처리한다. 위 safe 래퍼가 이 로직을 갖고 있다.
