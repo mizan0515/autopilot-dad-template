@@ -31,7 +31,15 @@ has_trailer() {
   if [ "$expected" = "*" ]; then
     [ -n "$val" ]
   else
-    [ "${val,,}" = "${expected,,}" ]
+    # Round-3 F34: previous form `[ "${val,,}" = "${expected,,}" ]` uses
+    # bash-4 lowercase parameter expansion. macOS ships /bin/bash 3.2 which
+    # rejects this with "bad substitution" — every commit on macOS would
+    # fail the trailer gate even with a correct trailer. Use POSIX-portable
+    # `tr` to lowercase, works on bash 3.2 and 4+.
+    local val_lc expected_lc
+    val_lc=$(printf '%s' "$val" | tr '[:upper:]' '[:lower:]')
+    expected_lc=$(printf '%s' "$expected" | tr '[:upper:]' '[:lower:]')
+    [ "$val_lc" = "$expected_lc" ]
   fi
 }
 
