@@ -10,6 +10,7 @@
     project.ps1 doctor                 Verify tool prerequisites (config/tooling green).
     project.ps1 smoke                  Live-runtime smoke (round-6 F56). Distinct from doctor: doctor checks config; smoke runs an actual user-flow through .autopilot/hooks/smoke.{ps1,sh} if present.
     project.ps1 install-hooks          Register .autopilot/hooks with git.
+    project.ps1 archive-history        Rotate HISTORY.md older entries to .autopilot/.archive when over the size cap (round-7 F70). Delegates to tools/Rotate-History.ps1.
 
   Loads .autopilot/config.json for project_name, operator_language, and locale strings from .autopilot/locales/<lang>/strings.json.
 #>
@@ -17,7 +18,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position=0)]
-  [ValidateSet('status', 'start', 'stop', 'resume', 'doctor', 'smoke', 'install-hooks')]
+  [ValidateSet('status', 'start', 'stop', 'resume', 'doctor', 'smoke', 'install-hooks', 'archive-history')]
   [string]$Verb = 'status'
 )
 
@@ -342,12 +343,26 @@ function Invoke-Resume {
   Write-Host "HALT cleared"
 }
 
+function Invoke-ArchiveHistory {
+  # Round-7 F70 — surface the Rotate-History.ps1 helper as an
+  # operator-facing verb. Pure markdown manipulation, no engine
+  # specifics. PROMPT.md row 15 prescribed the rotation; this verb
+  # makes it reproducible without hand-editing.
+  $rotator = Join-Path $RepoRoot 'tools/Rotate-History.ps1'
+  if (-not (Test-Path -LiteralPath $rotator)) {
+    Write-Error "[archive-history] tools/Rotate-History.ps1 not found"; exit 1
+  }
+  & pwsh -NoProfile -File $rotator -AutopilotRoot $AutopilotRoot
+  exit $LASTEXITCODE
+}
+
 switch ($Verb) {
-  'status'        { Invoke-Status }
-  'start'         { Invoke-Start }
-  'stop'          { Invoke-Stop }
-  'resume'        { Invoke-Resume }
-  'doctor'        { Invoke-Doctor }
-  'smoke'         { Invoke-Smoke }
-  'install-hooks' { Invoke-InstallHooks }
+  'status'          { Invoke-Status }
+  'start'           { Invoke-Start }
+  'stop'            { Invoke-Stop }
+  'resume'          { Invoke-Resume }
+  'doctor'          { Invoke-Doctor }
+  'smoke'           { Invoke-Smoke }
+  'install-hooks'   { Invoke-InstallHooks }
+  'archive-history' { Invoke-ArchiveHistory }
 }
