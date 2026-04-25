@@ -1,22 +1,72 @@
-#!/usr/bin/env bash
-# .autopilot/hooks/pre-commit — canonical git hook entry point.
-#
-# 1. protect.sh  → IMMUTABLE block guard on .autopilot/PROMPT.md
-# 2. .githooks/pre-commit → existing repo validators (docs/Codex/DAD/skills)
-#
-# Both must pass. Enable via:
-#   .autopilot/project.ps1 install-hooks  (Windows)
-#   .autopilot/project.sh  install-hooks  (Unix/CI)
+#!/usr/bin/env sh
+set -eu
 
-set -euo pipefail
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+cd "$repo_root"
 
-here="$(dirname "$0")"
-repo_root="$(git rev-parse --show-toplevel)"
+if command -v pwsh >/dev/null 2>&1; then
+  runner="pwsh"
+elif command -v powershell >/dev/null 2>&1; then
+  runner="powershell"
+elif command -v powershell.exe >/dev/null 2>&1; then
+  runner="powershell.exe"
+else
+  echo "PowerShell not found. Install pwsh 7.2+ or ensure powershell(.exe) is on PATH before using .githooks/pre-commit." >&2
+  exit 1
+fi
 
-# 1. IMMUTABLE guard
-bash "$here/protect.sh" "$@"
-
-# 2. Existing repo validators (only if the file exists — avoids hard coupling)
-if [ -x "$repo_root/.githooks/pre-commit" ]; then
-  exec "$repo_root/.githooks/pre-commit" "$@"
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-Documents.ps1 -Root . -IncludeRootGuides -IncludeAgentDocs -ReportLargeRootGuides -FailOnLargeDocs
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-CodexSkillMetadata.ps1 -RepoRoot .
+"$runner" -ExecutionPolicy Bypass -File tools/Register-CodexSkills.ps1 -RepoRoot . -SkillHome "$repo_root/.git/.codex-hook-validate" -ValidateOnly
+"$runner" -ExecutionPolicy Bypass -File tools/Lint-StaleTerms.ps1
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisions.ps1 -Root .
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisionWorkflow.ps1 -Root .
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadPacket.ps1 -Root . -AllSessions
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-ImmutableBlocks.ps1 -Root .
+# Round-4 F38: ledger consistency soft check. Surfaces drift between
+# RUNNER-LIVE.json's last phase and METRICS/FAILURES tail rows that
+# share the same run_id (F37). -Soft → drift logged but doesn't block
+# the commit, since the most common drift cause is a previous runner
+# crash that the agent's current commit may itself be repairing.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-LedgerConsistency.ps1 -AutopilotRoot .autopilot -Soft
+# Round-4 F39: runtime-evidence admission soft check. Surfaces shipped
+# rows whose active task carries a runtime-required tag but whose
+# METRICS row has no `runtime_evidence` field. -Soft → logged, doesn't
+# block (initial deployment).
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-RuntimeEvidence.ps1 -AutopilotRoot .autopilot -Soft
+# Round-4 F40: structured-failure-logging soft check. When the last
+# METRICS row outcome is non-clean (not shipped / doc-only / idle-
+# upkeep / bootstrap), expects a same-run_id FAILURES row. -Soft →
+# logged, doesn't block.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-FailuresLogged.ps1 -AutopilotRoot .autopilot -Soft
+# Round-4 F41: DAD report consumption gate (soft). Surfaces relay-
+# dropped reports under .autopilot/reports/ or .autopilot/generated/
+# whose status signals attention but that haven't been consumed
+# (mentioned in STATE/HISTORY tail or moved to consumed/). -Soft →
+# logged.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadReportConsumption.ps1 -AutopilotRoot .autopilot -Soft
+# Round-5 F42: HISTORY.md invariants (soft). Surfaces ordering
+# violations, duplicate iters, malformed headers, size cap exceeded.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-HistoryInvariants.ps1 -AutopilotRoot .autopilot -Soft
+# Round-5 F44: stale-state detection (soft). Surfaces RUNNER-LIVE
+# retained-dirty mismatches with actually-clean worktree, and open
+# draft PRs older than config.stale_draft_pr_hours (default 72h).
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-StaleStateDetection.ps1 -AutopilotRoot .autopilot -Soft
+# Round-5 F45: token-economy reporting (soft). Detects sustained
+# low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
+# PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
+# Round-7 F64: STATE.md self-reported timestamp invariant (soft).
+# Surfaces ISO8601 timestamps embedded in STATE.md that lead the
+# file's own mtime or the validator's wall clock by > skew (5 min
+# default). The default template ships no timestamp fields, so
+# well-behaved projects pass silently; operators who add fields like
+# `build_status_timestamp` / `last_iter_ts` opt in automatically.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-StateTimestamp.ps1 -AutopilotRoot .autopilot -Soft
+# Round-6 F53/F54: METRICS Tier-1 schema + ts monotonicity + Tier-3
+# prefix lint. ProjectPrefix omitted here so the Tier-3 prefix check
+# stays opt-in (set explicitly in project-side hooks once the project
+# slug stabilizes); ts/required-fields/JSON-validity always enforced.
+if [ -f .autopilot/METRICS.jsonl ]; then
+  "$runner" -ExecutionPolicy Bypass -File tools/Validate-Metrics.ps1 -Path .autopilot/METRICS.jsonl
 fi
