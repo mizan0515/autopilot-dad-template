@@ -113,6 +113,24 @@ Recommended cadence:
 
 ---
 
+## Iter classification — doc-only / bootstrap variants of core-contract steps
+
+The core contract is IMMUTABLE and applies to every iter, but the *concrete shape* of some steps depends on the iter's kind. This section spells out that mapping — it does not bypass the IMMUTABLE; it clarifies how steps 4 and 5 read for non-code iters (round-3 F21).
+
+Iter kinds:
+- **code-iter** — Active task touches code / schema / scripts. Core contract applies literally.
+- **doc-iter** — Active task touches only `.autopilot/*` (BACKLOG / STATE / HISTORY / PITFALLS / EVOLUTION) or `Document/dialogue/*`. No code change.
+- **bootstrap-iter (iter 0)** — first iter where the BACKLOG's lead item is the `[bootstrap]` task. Deliverable is rewriting the seed BACKLOG into 3-5 real PRD-derived tasks.
+
+For doc-iter / bootstrap-iter, the concrete shape of steps 4 and 5:
+- **Step 4 (minimal verification)**: the pre-commit hook chain *is* the verification (Validate-Documents · Validate-DadDecisions · Validate-ImmutableBlocks · commit-msg trailer gates). Skip running tests / typecheck / lint — there is no code change to verify.
+- **Step 5 (commit + push + PR)**: commit + push BACKLOG/STATE/HISTORY-only changes directly to `main`. No branch + PR + auto-merge cycle is needed. DECISIONS.md direct-edit is still forbidden (Validate-DadDecisionWorkflow blocks it). IMMUTABLE-block edits are still forbidden (Validate-ImmutableBlocks blocks them). The operator dashboard's PR-trail is formed by code-iter PRs; doc/bootstrap noise here would dilute the signal.
+- **METRICS.jsonl line**: `pr_url` is `null`. `outcome` is `"bootstrap"` (iter 0) or `"doc-only"`.
+
+A mixed (code + doc) change is a code-iter. When in doubt, treat as code-iter — the PR cycle is cheaper than a misdirected direct push.
+
+---
+
 ## Runtime-evidence trust gate
 
 `preflight.{ps1,sh}` runs two hooks separately:

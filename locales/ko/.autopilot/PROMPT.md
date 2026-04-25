@@ -113,6 +113,24 @@ AUTOPILOT_PROMPT_RELATIVE=.autopilot/PROMPT.lite.md
 
 ---
 
+## iter 분류 — 핵심 계약 단계의 doc-only/bootstrap 변형
+
+핵심 계약은 모든 iter 에 적용되는 IMMUTABLE 이지만, 일부 단계의 "구체적 형태" 는 iter 종류에 따라 달라진다. 이 섹션은 그 매핑을 명시한다 — IMMUTABLE 자체를 우회하는 것이 아니라, 단계 4·5 의 의미를 iter 종류별로 명확화한다 (round-3 F21).
+
+iter 종류:
+- **code-iter** — Active task 가 코드 / 스키마 / 스크립트를 수정한다. 핵심 계약을 문자 그대로 적용한다.
+- **doc-iter** — Active task 가 `.autopilot/*` (BACKLOG / STATE / HISTORY / PITFALLS / EVOLUTION) 또는 `Document/dialogue/*` 만 수정한다. 코드 변경 없음.
+- **bootstrap-iter (iter 0)** — `[bootstrap]` 태그가 BACKLOG 첫 항목인 첫 iter. 시드 BACKLOG 를 PRD 기반 실제 과제로 교체하는 것이 deliverable.
+
+doc-iter / bootstrap-iter 인 경우 단계 4·5 의 구체적 형태:
+- **단계 4 (최소 검증)**: pre-commit 훅 체인이 곧 검증이다 (Validate-Documents · Validate-DadDecisions · Validate-ImmutableBlocks · commit-msg 트레일러 가드). 별도 테스트/타입체크/린트 실행 안 함 — 검증할 코드가 없다.
+- **단계 5 (커밋 + 푸시 + PR)**: BACKLOG/STATE/HISTORY 같은 운영 파일은 main 으로 직접 커밋 + 푸시한다 (별도 브랜치 + PR + 머지 사이클 불필요). DECISIONS.md 직접 수정은 여전히 금지 (`Validate-DadDecisionWorkflow` 가 막음). IMMUTABLE 블록 편집도 여전히 금지 (`Validate-ImmutableBlocks` 가 막음). 운영자 대시보드의 자기언어 PR 트레일은 code-iter 의 PR 들로 충분히 형성된다.
+- **METRICS.jsonl 라인**: `pr_url` 은 `null`. `outcome` 은 `"bootstrap"` (iter 0) 또는 `"doc-only"`.
+
+혼합 (코드 + 문서) 변경은 code-iter 로 분류한다. 의심스러우면 code-iter 로 처리한다 — PR 사이클이 직접 푸시 실수보다 비용이 낮다.
+
+---
+
 ## 런타임 증거 신뢰 게이트
 
 `preflight.{ps1,sh}` 는 두 개의 훅을 분리해서 실행한다:
