@@ -56,6 +56,12 @@ fi
 # low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
 # PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
+# Round-7 F72: PR-title language enforcement (soft). When
+# operator_language is a CJK locale (ko/ja/zh), flags open PRs
+# authored by @me whose titles carry zero CJK glyphs (after a
+# conventional-commit prefix is stripped). Non-CJK operator,
+# missing config/gh, or empty PR list → silent skip.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-PrLanguage.ps1 -AutopilotRoot .autopilot -Soft
 # Round-7 F69: doctor self-emission run_id contract (soft, F57
 # closeout). Scans METRICS/FAILURES tails for rows that look
 # auto-repair-shaped (source=doctor, event ^doctor-/^auto-repair-/
