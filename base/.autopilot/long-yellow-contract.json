@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "_doc": "Round-7 F68 manifest. Each check pins a METRICS.jsonl field to a list of `yellow` values (recoverable-but-not-green states). When the last `max_unchanged_iters+1` rows all carry the same field value AND that value is in `yellow_values`, Validate-LongYellowState.ps1 emits a `long-yellow-state-stuck` drift so the operator dashboard can escalate. Default contract ships with an empty `checks` array — a project's yellow vocabulary is project-specific (a Node service might track `service_health: degraded`; a Go daemon might track `dependency_status: outdated`; a web app `bundle_status: stale_in_cache`; a game engine `asset_status: ok_with_historical_drift`). Add an entry per (field, yellow-values) pair you want to age out.",
+  "_example_entry": {
+    "comment": "Uncomment / adapt and add to checks below. Field name is matched literally against METRICS.jsonl row keys; values are matched as strings.",
+    "field": "repo_identity_status",
+    "yellow_values": ["ok_with_historical_drift", "stale_but_recoverable"],
+    "max_unchanged_iters": 5,
+    "detail": "Repo identity has been yellow for 5+ consecutive iters; investigate whether the historical drift can now be reconciled or escalate."
+  },
+  "checks": []
+}
