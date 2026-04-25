@@ -62,7 +62,18 @@ foreach ($item in $inventory) {
     $newName = $nameMap[$item.DirectoryName]
     $skillText = Read-Utf8Text -Path $item.SkillMarkdownPath
     $skillText = [regex]::Replace($skillText, '(?m)^name:\s*.+$', "name: $newName", 1)
-    $skillText = [regex]::Replace($skillText, '(?m)^description:\s*".+"$', ('description: "' + $spec[$item.Suffix].Description.Replace('__SKILL_NAME__', "`$$newName").Replace('"', '\"') + '"'), 1)
+    # Round-3 F27: previous regex `^description:\s*".+"$` required the closing
+    # `"` to sit immediately at end-of-line, but the shipped Korean SKILL.md
+    # has a trailing space (or other whitespace) after the closing quote.
+    # Result: regex never matched, description was left as the source-project
+    # `CardGame 저장소 전용...` text even after a successful folder rename
+    # and `$skill-name` substitution. Codex's skill matching reads the
+    # description prose, so a "CardGame repository-only" description on a
+    # `dogfood-sample-dialogue-start` skill confuses routing. Use the same
+    # `.+$` shape the openai.yaml replacements use (which works) — match
+    # any content on the description line, regardless of trailing whitespace
+    # or escaped-quote placement.
+    $skillText = [regex]::Replace($skillText, '(?m)^description:\s*.+$', ('description: "' + $spec[$item.Suffix].Description.Replace('__SKILL_NAME__', "`$$newName").Replace('"', '\"') + '"'), 1)
     foreach ($oldName in $nameMap.Keys) {
         $skillText = $skillText.Replace("`$$oldName", "`$$($nameMap[$oldName])")
     }
