@@ -56,6 +56,13 @@ fi
 # low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
 # PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
+# Round-7 F69: doctor self-emission run_id contract (soft, F57
+# closeout). Scans METRICS/FAILURES tails for rows that look
+# auto-repair-shaped (source=doctor, event ^doctor-/^auto-repair-/
+# -normalized$, or repair_count present) and missing run_id.
+# Catches the F37 correlation-key gap when an operator extends
+# doctor with an auto-repair pass.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DoctorEmissions.ps1 -AutopilotRoot .autopilot -Soft
 # Round-7 F68: long-yellow state aging (soft). Reads
 # .autopilot/long-yellow-contract.json; for each registered field,
 # checks the last (max_unchanged_iters+1) METRICS rows. If they all
