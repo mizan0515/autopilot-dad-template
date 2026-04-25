@@ -96,6 +96,19 @@
       }).join('');
     }
 
+    function renderGateSignals(items) {
+      if (!items || !items.length) return `<div class="empty">${esc(d.empty_gate_signals)}</div>`;
+      return items.map(i => `
+        <article class="story-card">
+          <div class="story-top">
+            <span class="story-badge">×${esc(i.count)}</span>
+            <span>${esc(i.last_ts || '')}</span>
+          </div>
+          <h3>${esc(i.event)}</h3>
+          <p class="muted">${esc(i.last_result || '')}</p>
+        </article>`).join('');
+    }
+
     function renderGlossary(items) {
       if (!items || !items.length) return '';
       return items.map(i => `
@@ -136,6 +149,12 @@
         <h2>${htmlOrEsc(d.dad_sessions)}</h2>
         <p class="muted">${esc(d.dad_sessions_hint)}</p>
         <div class="story-list">${renderDadSessions(data.dad_sessions || [])}</div>
+      </section>
+
+      <section class="panel" style="margin-bottom:20px;">
+        <h2>${htmlOrEsc(d.gate_signals)}</h2>
+        <p class="muted">${esc(d.gate_signals_hint)}</p>
+        <div class="story-list">${renderGateSignals(data.gate_signals || [])}</div>
       </section>
 
       <section class="panel">

@@ -28,7 +28,10 @@
     "empty_timeline": "표시할 최근 작업이 없습니다.",
     "empty_prs": "지금 열려 있는 자동 PR은 없습니다.",
     "empty_manager_actions": "지금은 관리자님이 따로 할 일이 없습니다.",
-    "pr_lang_mismatch": "⚠ 제목 언어 불일치"
+    "pr_lang_mismatch": "⚠ 제목 언어 불일치",
+    "gate_signals": "🛡 자동 검증 신호",
+    "gate_signals_hint": "최근 검증기 (F38–F45) 가 잡아낸 비정상 신호. 비어 있으면 모두 정상.",
+    "empty_gate_signals": "최근 검증기 경보가 없습니다."
   },
   "status_labels": {
     "converged": "✅ 대화 끝남",
