@@ -96,6 +96,36 @@ iter 시작 직후:
 
 ---
 
+## 런타임 증거 인정 (round-4 F39)
+
+UX 가시 / 런타임 의존 작업 — `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[playmode]`, `[scene]`, `[battle]`, `[gameplay]`, `[e2e]`, `[smoke]` 태그가 BACKLOG 또는 STATE 의 Active Task 에 붙은 iter — 가 `outcome:"shipped"` 를 주장할 때, METRICS.jsonl 라인은 반드시 `runtime_evidence` 객체를 포함한다. 그 객체는 아래 네 필드 중 **최소 하나** 가 비어 있지 않아야 한다:
+
+```jsonl
+{
+  "ts":"2026-04-25T01:49:25Z","iter":118,"run_id":"4e1b...","outcome":"shipped",
+  "runtime_evidence": {
+    "screenshot_path"      : ".autopilot/qa-evidence/qa-battle-20260425-123218.png",
+    "smoke_exit_code"      : 0,
+    "mcp_tool_response"    : "Unity MCP play_mode response: 60fps stable",
+    "play_mode_session_id" : "pmsess-2026-04-25-12-32-18"
+  }
+}
+```
+
+각 필드의 의미:
+- `screenshot_path` — 캡처된 화면 (Unity Play Mode, Selenium, Playwright 등). 상대 경로.
+- `smoke_exit_code` — smoke / e2e 테스트 exit code. 0 = pass.
+- `mcp_tool_response` — live MCP tool probe 의 짧은 응답 요약 (Unity MCP, Claude Preview, DB 등).
+- `play_mode_session_id` — Play Mode / 시뮬레이션 세션 식별자.
+
+운영자가 보고한 실사용 사고 (Unity-card-game): 9 개 PR 이 UX 가시 작업으로 라벨된 채 어떤 런타임 캡처도 없이 머지됐고, STATE/HISTORY 는 "MCP 가 없어서 fresh QA 스크린샷 없음" 을 반복 기록했다. 진짜 원인은 MCP 부재가 아니라 **증거를 요구하는 게이트 자체가 없었던 것**. 이 섹션이 그 게이트의 에이전트-측 계약이고, `tools/Validate-RuntimeEvidence.ps1` 가 강제하는 검사다.
+
+태그가 도큐먼트만 다루는 iter (`[doc-only]`, `[bootstrap]`, `[idle-upkeep]`) 면 `runtime_evidence` 는 생략해도 된다 — 이 게이트는 tag-driven 이다.
+
+증거를 만들 수 없는 환경 (preflight-runtime-bridge unresponsive) 에서는 outcome 을 `shipped` 가 아니라 `doc-only` / `idle-upkeep` 으로 낮춰 기록한다. "shipped 인데 evidence 가 없는" 상태는 절대 합법이 아니다.
+
+---
+
 ## 운영 원장 상관관계 (run_id, round-4 F37)
 
 각 iter 의 운영 장부는 동일 `run_id` 로 묶여야 한다. 러너가 iter 시작 시 UUID 를 생성해 `$env:AUTOPILOT_RUN_ID` (PowerShell) / `$AUTOPILOT_RUN_ID` (bash) 로 노출한다. 이 값을 그대로 `RUNNER-LIVE.json`, `FAILURES.jsonl` (preflight + stalled-fallback 라인) 에 박아 넣는다.

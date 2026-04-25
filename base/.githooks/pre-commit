@@ -29,3 +29,8 @@ fi
 # the commit, since the most common drift cause is a previous runner
 # crash that the agent's current commit may itself be repairing.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-LedgerConsistency.ps1 -AutopilotRoot .autopilot -Soft
+# Round-4 F39: runtime-evidence admission soft check. Surfaces shipped
+# rows whose active task carries a runtime-required tag but whose
+# METRICS row has no `runtime_evidence` field. -Soft → logged, doesn't
+# block (initial deployment).
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-RuntimeEvidence.ps1 -AutopilotRoot .autopilot -Soft

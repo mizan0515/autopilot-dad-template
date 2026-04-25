@@ -96,6 +96,36 @@ Right before exiting, in this order:
 
 ---
 
+## Runtime-evidence admission (round-4 F39)
+
+When a UX-visible / runtime-touching iter — Active Task carries any of `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[playmode]`, `[scene]`, `[battle]`, `[gameplay]`, `[e2e]`, `[smoke]` — claims `outcome:"shipped"`, the METRICS.jsonl line MUST include a `runtime_evidence` object. At least one of the four fields below must be present and non-empty:
+
+```jsonl
+{
+  "ts":"2026-04-25T01:49:25Z","iter":118,"run_id":"4e1b...","outcome":"shipped",
+  "runtime_evidence": {
+    "screenshot_path"      : ".autopilot/qa-evidence/qa-battle-20260425-123218.png",
+    "smoke_exit_code"      : 0,
+    "mcp_tool_response"    : "Unity MCP play_mode response: 60fps stable",
+    "play_mode_session_id" : "pmsess-2026-04-25-12-32-18"
+  }
+}
+```
+
+Field meanings:
+- `screenshot_path` — captured screen (Unity Play Mode, Selenium, Playwright, etc.). Relative path.
+- `smoke_exit_code` — smoke / e2e test exit code. 0 = pass.
+- `mcp_tool_response` — short summary of a live MCP tool probe response (Unity MCP, Claude Preview, DB ping, etc.).
+- `play_mode_session_id` — play-mode / simulation session identifier.
+
+Operator-reported real failure (Unity-card-game): 9 PRs were merged labeled UX-visible without any runtime capture. STATE/HISTORY repeatedly logged "MCP가 없어서 fresh QA 스크린샷 없음" — but the real cause wasn't MCP absence; **no gate demanded the evidence at all**. This section is the agent-side contract for that gate; `tools/Validate-RuntimeEvidence.ps1` enforces it.
+
+Iters whose tags are doc-only (`[doc-only]`, `[bootstrap]`, `[idle-upkeep]`) can omit `runtime_evidence` — this gate is tag-driven.
+
+When evidence cannot be produced (preflight-runtime-bridge unresponsive), the agent must record `outcome:"doc-only"` or `outcome:"idle-upkeep"` instead of `shipped`. A `shipped` row with no evidence on a runtime-tagged task is never legitimate.
+
+---
+
 ## Operational ledger correlation (run_id, round-4 F37)
 
 Every iter's operational ledgers must be bound by a shared `run_id`. The runner generates a UUID at iter start and exposes it as `$env:AUTOPILOT_RUN_ID` (PowerShell) / `$AUTOPILOT_RUN_ID` (bash). The runner then stamps that value into `RUNNER-LIVE.json` and `FAILURES.jsonl` (preflight + stalled-fallback lines).
