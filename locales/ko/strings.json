@@ -31,7 +31,13 @@
     "pr_lang_mismatch": "⚠ 제목 언어 불일치",
     "gate_signals": "🛡 자동 검증 신호",
     "gate_signals_hint": "최근 검증기 (F38–F45) 가 잡아낸 비정상 신호. 비어 있으면 모두 정상.",
-    "empty_gate_signals": "최근 검증기 경보가 없습니다."
+    "empty_gate_signals": "최근 검증기 경보가 없습니다.",
+    "dad_reports": "🤝 DAD 보고서 처리 현황",
+    "dad_reports_hint": "릴레이가 떨어뜨린 보고서. \"확인 필요\"는 운영자/에이전트가 아직 STATE 또는 HISTORY 에 처리 흔적을 남기지 않은 것. \"처리 완료\"는 이미 소비됐거나 .autopilot/consumed/ 로 이동됐음.",
+    "empty_dad_reports": "최근 DAD 보고서가 없습니다.",
+    "dad_report_attention": "🚩 확인 필요",
+    "dad_report_consumed": "✅ 처리 완료",
+    "dad_report_neutral": "ℹ 자동 통과"
   },
   "status_labels": {
     "converged": "✅ 대화 끝남",

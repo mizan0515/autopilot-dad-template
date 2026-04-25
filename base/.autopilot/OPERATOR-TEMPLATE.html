@@ -109,6 +109,25 @@
         </article>`).join('');
     }
 
+    function renderDadReports(items) {
+      if (!items || !items.length) return `<div class="empty">${esc(d.empty_dad_reports)}</div>`;
+      return items.map(i => {
+        let badge;
+        if (i.attention) badge = esc(d.dad_report_attention);
+        else if (i.consumed) badge = esc(d.dad_report_consumed);
+        else badge = esc(d.dad_report_neutral);
+        return `
+        <article class="story-card">
+          <div class="story-top">
+            <span class="story-badge">${badge}</span>
+            <span>${esc(i.mtime || '')}</span>
+          </div>
+          <h3>${esc(i.file)}</h3>
+          <p class="muted">${esc(i.reason || '')}</p>
+        </article>`;
+      }).join('');
+    }
+
     function renderGlossary(items) {
       if (!items || !items.length) return '';
       return items.map(i => `
@@ -155,6 +174,12 @@
         <h2>${htmlOrEsc(d.gate_signals)}</h2>
         <p class="muted">${esc(d.gate_signals_hint)}</p>
         <div class="story-list">${renderGateSignals(data.gate_signals || [])}</div>
+      </section>
+
+      <section class="panel" style="margin-bottom:20px;">
+        <h2>${htmlOrEsc(d.dad_reports)}</h2>
+        <p class="muted">${esc(d.dad_reports_hint)}</p>
+        <div class="story-list">${renderDadReports(data.dad_reports || [])}</div>
       </section>
 
       <section class="panel">

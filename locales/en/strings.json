@@ -31,7 +31,13 @@
     "pr_lang_mismatch": "⚠ title language mismatch",
     "gate_signals": "🛡 Validator signals",
     "gate_signals_hint": "Anomalies recently caught by the soft-deployed validators (F38–F45). Empty means all clear.",
-    "empty_gate_signals": "No recent validator alerts."
+    "empty_gate_signals": "No recent validator alerts.",
+    "dad_reports": "🤝 DAD report consumption",
+    "dad_reports_hint": "Reports the relay dropped under .autopilot/reports or .autopilot/generated. \"Needs attention\" means the operator/agent has not yet recorded handling in STATE or HISTORY. \"Consumed\" means the report was already handled or moved under .autopilot/consumed/.",
+    "empty_dad_reports": "No recent DAD reports.",
+    "dad_report_attention": "🚩 needs attention",
+    "dad_report_consumed": "✅ consumed",
+    "dad_report_neutral": "ℹ informational"
   },
   "status_labels": {
     "converged": "✅ Talk ended",
