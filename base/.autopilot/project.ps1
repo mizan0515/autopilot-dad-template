@@ -7,7 +7,8 @@
     project.ps1 start                  Start the runner loop.
     project.ps1 stop                   Signal the runner to halt.
     project.ps1 resume                 Remove HALT marker.
-    project.ps1 doctor                 Verify tool prerequisites.
+    project.ps1 doctor                 Verify tool prerequisites (config/tooling green).
+    project.ps1 smoke                  Live-runtime smoke (round-6 F56). Distinct from doctor: doctor checks config; smoke runs an actual user-flow through .autopilot/hooks/smoke.{ps1,sh} if present.
     project.ps1 install-hooks          Register .autopilot/hooks with git.
 
   Loads .autopilot/config.json for project_name, operator_language, and locale strings from .autopilot/locales/<lang>/strings.json.
@@ -16,7 +17,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position=0)]
-  [ValidateSet('status', 'start', 'stop', 'resume', 'doctor', 'install-hooks')]
+  [ValidateSet('status', 'start', 'stop', 'resume', 'doctor', 'smoke', 'install-hooks')]
   [string]$Verb = 'status'
 )
 
@@ -287,6 +288,44 @@ function Invoke-Doctor {
   Write-Host "doctor: OK"
 }
 
+function Invoke-Smoke {
+  # Round-6 F56 — engine-agnostic live-runtime smoke.
+  #
+  # Real failure on `D:\cardgame-dad-relay`: `project.sh doctor` returned
+  # green but the live runtime path was broken (relay HISTORY iter 18
+  # `[smoke] FAIL exit=2 + 0 turn YAMLs` after autonomous backlog showed
+  # "all green"). Universal: any template-using project ships `doctor`
+  # which only checks config/tools, not actual end-to-end behaviour.
+  #
+  # This entrypoint is a thin shell: runs doctor first (config-green
+  # gate), then if `.autopilot/hooks/smoke.ps1` (preferred) or
+  # `.autopilot/hooks/smoke.sh` exists, executes it. Engine-agnostic
+  # by design — Python projects can launch a pytest, web projects can
+  # curl a health endpoint, Unity projects can run an EditMode test,
+  # CLI projects can execute the binary with --version. Template
+  # ships no opinionated implementation.
+  Invoke-Doctor
+
+  $smokePs1 = Join-Path $AutopilotRoot 'hooks/smoke.ps1'
+  $smokeSh  = Join-Path $AutopilotRoot 'hooks/smoke.sh'
+  if (Test-Path -LiteralPath $smokePs1) {
+    Write-Host "[smoke] running .autopilot/hooks/smoke.ps1"
+    & $smokePs1
+    if ($LASTEXITCODE -ne 0) { Write-Error "[smoke] hook exited non-zero ($LASTEXITCODE)"; exit 1 }
+    Write-Host "[smoke] OK"
+  } elseif (Test-Path -LiteralPath $smokeSh) {
+    Write-Host "[smoke] running .autopilot/hooks/smoke.sh"
+    $bash = Get-Command bash -ErrorAction SilentlyContinue
+    if (-not $bash) { Write-Error "[smoke] bash not found on PATH; cannot run smoke.sh"; exit 1 }
+    & bash $smokeSh
+    if ($LASTEXITCODE -ne 0) { Write-Error "[smoke] hook exited non-zero ($LASTEXITCODE)"; exit 1 }
+    Write-Host "[smoke] OK"
+  } else {
+    Write-Host "[smoke] no .autopilot/hooks/smoke.{ps1,sh} configured — skipping live-runtime check"
+    Write-Host "[smoke] (drop a project-specific hook there to verify end-to-end behaviour beyond doctor's config check)"
+  }
+}
+
 function Invoke-Start {
   $runner = Join-Path $AutopilotRoot 'runners/runner.ps1'
   if (-not (Test-Path $runner)) { throw "runner missing: $runner" }
@@ -309,5 +348,6 @@ switch ($Verb) {
   'stop'          { Invoke-Stop }
   'resume'        { Invoke-Resume }
   'doctor'        { Invoke-Doctor }
+  'smoke'         { Invoke-Smoke }
   'install-hooks' { Invoke-InstallHooks }
 }

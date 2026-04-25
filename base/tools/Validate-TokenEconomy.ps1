@@ -83,6 +83,7 @@ try {
 } catch { exit 0 }
 
 $rowsWithRatio = @()
+$rowsWithRatioField = @()  # F58: rows that mention cache_read_ratio at all (number OR null)
 foreach ($line in $lines) {
   if ([string]::IsNullOrWhiteSpace($line)) { continue }
   try {
@@ -92,15 +93,58 @@ foreach ($line in $lines) {
     if ($null -eq $te) { continue }
     if ($te.PSObject.Properties.Name -notcontains 'cache_read_ratio') { continue }
     $val = $te.cache_read_ratio
+    $iter = if ($row.PSObject.Properties.Name -contains 'iter') { [int]$row.iter } else { 0 }
+    $rowsWithRatioField += [ordered]@{
+      iter      = $iter
+      isNumeric = ($val -is [int] -or $val -is [long] -or $val -is [double] -or $val -is [decimal])
+    }
     # Only treat as "reported" if it's a number; skip nulls / strings.
     if ($val -is [int] -or $val -is [long] -or $val -is [double] -or $val -is [decimal]) {
       $rowsWithRatio += [ordered]@{
         run_id = if ($row.PSObject.Properties.Name -contains 'run_id') { [string]$row.run_id } else { '' }
-        iter   = if ($row.PSObject.Properties.Name -contains 'iter')   { [int]$row.iter }     else { 0 }
+        iter   = $iter
         ratio  = [double]$val
       }
     }
   } catch { }
+}
+
+# Round-6 F58 — cache_read_ratio null-streak gate.
+#
+# Real failure on `D:\Unity\card game\.autopilot\` iters 112-118 (7 consecutive):
+# every iter recorded `cache_read_ratio: null`. F45's threshold gate skips
+# null silently, producing a complete observability blind-spot exactly when
+# the operator most needs telemetry. Universal pattern: any non-Anthropic-
+# prompt-cached engine (Codex CLI, openai CLI, future adapters) reports
+# null and the operator has no signal.
+#
+# Heuristic: if ≥ NullStreakThreshold (default 5) consecutive recent rows
+# carry the field but with null/non-numeric value, surface a structured
+# `token-telemetry-broken` row to FAILURES.jsonl. This is a presence-streak
+# gate, NOT a threshold gate — it fires even when threshold can't be
+# computed.
+$NullStreakThreshold = 5
+if ($rowsWithRatioField.Count -ge $NullStreakThreshold) {
+  $tailField = $rowsWithRatioField[-$NullStreakThreshold..-1]
+  $allNull = $true
+  foreach ($r in $tailField) { if ($r.isNumeric) { $allNull = $false; break } }
+  if ($allNull) {
+    $itersStr = ($tailField | ForEach-Object { $_.iter }) -join ', '
+    $runId = if ($env:AUTOPILOT_RUN_ID) { $env:AUTOPILOT_RUN_ID } else { '' }
+    $tnRow = [ordered]@{
+      ts                 = (Get-Date -Format 'o')
+      run_id             = $runId
+      event              = 'token-telemetry-broken'
+      result             = 'cache-read-ratio-null-streak'
+      threshold_iters    = $NullStreakThreshold
+      observed_iters     = $itersStr
+      detail             = "Last $NullStreakThreshold consecutive METRICS rows reported token_economy.cache_read_ratio as null/non-numeric: iters [$itersStr]. The threshold gate (F45) cannot fire — observability blind-spot. Likely cause: AI-engine adapter does not expose Anthropic prompt-cache stats (Codex CLI, openai CLI, etc.) OR the relay broker isn't propagating the field. Recovery: verify the relay/adapter writes a numeric ratio per iter; if the engine genuinely has no prompt-cache, omit the field entirely so F45 stays silent rather than recording null."
+    }
+    Write-DriftRow -Path $failuresPath -Row $tnRow
+    Write-Host "[token-economy] TELEMETRY-BROKEN — cache_read_ratio null for $NullStreakThreshold consecutive iters [$itersStr]" -ForegroundColor Yellow
+    Write-Host "  drift event appended to FAILURES.jsonl"
+    if (-not $Soft) { exit 1 }
+  }
 }
 
 if ($rowsWithRatio.Count -lt $ConsecutiveLowThreshold) {
