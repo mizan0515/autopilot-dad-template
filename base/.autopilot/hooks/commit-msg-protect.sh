@@ -100,10 +100,31 @@ if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
   exit 0
 fi
 
-base_markers=$(git show "HEAD:$PROMPT" 2>/dev/null | grep -oE '\[IMMUTABLE:BEGIN [a-z-]+\]' | sort -u || true)
-head_markers=$(git show ":$PROMPT" | grep -oE '\[IMMUTABLE:BEGIN [a-z-]+\]' | sort -u)
+# Round-3 F19: skip the IMMUTABLE-ADD authorization gate when PROMPT.md is
+# being newly added rather than modified. This check exists to prevent self-
+# evolution from silently granting itself new charter blocks; on the first
+# `chore: apply autopilot-dad-template` commit, PROMPT.md doesn't exist in
+# HEAD so every IMMUTABLE marker would be flagged as "newly introduced" and
+# the operator would have to write IMMUTABLE-ADD trailers for every block.
+# That's not the gate's intent.
+if git diff --cached --name-only --diff-filter=A | grep -qx "$PROMPT"; then
+  exit 0
+fi
+
+# Round-3 F19: this regex used to be `\[IMMUTABLE:BEGIN [a-z-]+\]` (square-
+# bracket form) but PROMPT.md actually uses HTML-comment markers
+# `<!-- IMMUTABLE:<name>:BEGIN -->`. Result: grep -oE found nothing on every
+# commit that touched PROMPT.md, and because line 2 had no `|| true`, the
+# empty grep + pipefail propagated `set -e` and **silently aborted every
+# such commit with exit 1 and no diagnostic**. The bug went undetected for
+# ages because the F18-pre `.githooks/commit-msg` shim didn't exist, so
+# commit-msg-protect.sh was never invoked. Fix: match the real syntax and
+# add `|| true` to the second pipeline so a no-marker file is treated as
+# "no markers" rather than as a script failure.
+base_markers=$(git show "HEAD:$PROMPT" 2>/dev/null | grep -oE '<!--[[:space:]]*IMMUTABLE:[a-z-]+:BEGIN[[:space:]]*-->' | sort -u || true)
+head_markers=$(git show ":$PROMPT" 2>/dev/null | grep -oE '<!--[[:space:]]*IMMUTABLE:[a-z-]+:BEGIN[[:space:]]*-->' | sort -u || true)
 added_markers=$(comm -23 <(printf '%s\n' "$head_markers") <(printf '%s\n' "$base_markers") \
-                  | sed -E 's/^\[IMMUTABLE:BEGIN ([a-z-]+)\]$/\1/' | grep -v '^$' || true)
+                  | sed -E 's/^<!--[[:space:]]*IMMUTABLE:([a-z-]+):BEGIN[[:space:]]*-->$/\1/' | grep -v '^$' || true)
 
 for name in $added_markers; do
   if ! printf '%s\n' "$commit_msg" | grep -qE "^IMMUTABLE-ADD:[[:space:]]*${name}[[:space:]]*$"; then
