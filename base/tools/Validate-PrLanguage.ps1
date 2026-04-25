@@ -5,17 +5,24 @@
 # convention but nothing enforced it; the OPERATOR-LIVE.html PR
 # panel surfaced `lang_mismatch` only after the PR existed).
 #
-# When the operator language is a CJK locale (ko / ja / zh), an
-# autopilot-authored PR title that contains zero CJK characters
-# (after stripping a leading conventional-commit prefix like
-# `fix:` / `feat:` / `chore:`) is flagged. Operators reading the
-# dashboard expect their language; English-only titles bleeding
-# into a ko/ja/zh dashboard create friction.
+# Bidirectional check (round-7 F73 expansion of F72):
+#   - CJK operator (ko / ja / zh) + autopilot-authored PR title
+#     with zero CJK glyphs (after stripping a leading
+#     conventional-commit prefix like `fix:` / `feat:` / `chore:`)
+#     → flag as `pr-language-mismatch-cjk-body-missing`. The
+#     operator's dashboard expects their language; English-only
+#     titles create friction.
+#   - non-CJK operator (en, default) + PR title that DOES contain
+#     CJK glyphs in the body → flag as
+#     `pr-language-mismatch-unexpected-cjk`. An English-locale
+#     operator reading their dashboard wouldn't expect ko/ja/zh
+#     body text mixed in.
 #
-# Universal: works for any operator language. Non-CJK operator
-# languages currently silent-pass (the heuristic is conservative —
-# extending it to detect Cyrillic / Arabic / Greek / Devanagari
-# titles in their respective locales is a future PR).
+# Universal: works for any operator language. The CJK-glyph
+# detection covers Hiragana / Katakana / CJK Unified / Hangul.
+# Future extensions (Cyrillic / Arabic / Greek / Devanagari) can
+# add their respective Unicode-range checks behind a similar
+# bidirectional gate.
 #
 # This validator runs at pre-commit time AND can be invoked
 # standalone. It calls `gh pr list --author @me` so it only flags
@@ -28,10 +35,13 @@
 #                            head branch starts with this prefix
 #                            (default empty = all PRs by @me).
 #
-# Drift kind:
-#   `pr-language-mismatch` — open PR title doesn't carry CJK glyphs
-#                            even though operator_language is a CJK
-#                            locale.
+# Drift kinds:
+#   `cjk-body-missing`     — CJK operator, PR body has zero CJK
+#                            glyphs (the F72 case).
+#   `unexpected-cjk`       — non-CJK operator, PR body has CJK
+#                            glyphs (round-7 F73 expansion).
+#
+# Both are emitted under the parent event `pr-language-mismatch`.
 #
 # Soft-deployed (run with `-Soft`): drift is logged with run_id
 # correlation but does not block the commit.
@@ -85,10 +95,7 @@ if ($skip) { Write-Host "[pr-language] skip_pr_language_check=true — skipping"
 if (-not $operatorLang) { Write-Host "[pr-language] operator_language not set — skipping"; exit 0 }
 
 $primaryLang = ($operatorLang -split '[-_]')[0].ToLowerInvariant()
-if ($primaryLang -notin @('ko','ja','zh')) {
-  Write-Host "[pr-language] operator_language='$operatorLang' is not a CJK locale — skipping"
-  exit 0
-}
+$operatorIsCjk = $primaryLang -in @('ko','ja','zh')
 
 # --- gh availability ------------------------------------------------------
 
@@ -120,14 +127,17 @@ if ($prs.Count -eq 0) {
   exit 0
 }
 
-# --- mismatch heuristic (mirrors project.ps1 Test-PrTitleLangMismatch) ---
+# --- mismatch heuristic (bidirectional, round-7 F73) --------------------
 
-function Test-IsMismatch([string]$Title) {
-  if (-not $Title) { return $false }
-  $body = $Title
-  if ($Title -match '^[a-z]+(\([^)]+\))?:\s*(.+)$') { $body = $Matches[2] }
-  $hasCjk = ($body -match '[぀-ヿ㐀-䶿一-鿿가-힯]')
-  return -not $hasCjk
+function Get-TitleBody([string]$Title) {
+  if (-not $Title) { return '' }
+  if ($Title -match '^[a-z]+(\([^)]+\))?:\s*(.+)$') { return $Matches[2] }
+  return $Title
+}
+
+function Test-HasCjk([string]$Body) {
+  if (-not $Body) { return $false }
+  return ($Body -match '[぀-ヿ㐀-䶿一-鿿가-힯]')
 }
 
 $drifts = @()
@@ -135,14 +145,28 @@ foreach ($pr in $prs) {
   $branch = [string]$pr.headRefName
   if ($branchPrefix -and -not $branch.StartsWith($branchPrefix)) { continue }
   $title = [string]$pr.title
-  if (Test-IsMismatch $title) {
+  $body = Get-TitleBody $title
+  $hasCjk = Test-HasCjk $body
+
+  $driftType = ''
+  $detail = ''
+  if ($operatorIsCjk -and -not $hasCjk) {
+    $driftType = 'cjk-body-missing'
+    $detail = "Open PR #$($pr.number) ('$title') has no $primaryLang glyphs in the title body. CLAUDE.md PR-language convention requires titles in operator_language='$operatorLang'. Rename the PR (gh pr edit $($pr.number) --title '...') or add operator-language body text after the conventional-commit prefix."
+  }
+  elseif (-not $operatorIsCjk -and $hasCjk) {
+    $driftType = 'unexpected-cjk'
+    $detail = "Open PR #$($pr.number) ('$title') contains CJK glyphs in the title body, but operator_language='$operatorLang' (non-CJK). The operator's dashboard expects their language; mixed-script PR titles create friction. Rename the PR (gh pr edit $($pr.number) --title '...') in the operator's language."
+  }
+
+  if ($driftType) {
     $drifts += [pscustomobject]@{
-      type      = 'pr-language-mismatch'
+      type      = $driftType
       pr_number = [int]$pr.number
       pr_title  = $title
       pr_url    = [string]$pr.url
       branch    = $branch
-      detail    = "Open PR #$($pr.number) ('$title') has no $primaryLang glyphs in the title body. CLAUDE.md PR-language convention requires titles in operator_language='$operatorLang'. Rename the PR (gh pr edit $($pr.number) --title '...') or add operator-language body text after the conventional-commit prefix."
+      detail    = $detail
     }
   }
 }
@@ -154,7 +178,11 @@ if (Test-Path -LiteralPath $failuresPath) {
   try { $existingTail = @(Get-Content -LiteralPath $failuresPath -Tail 30 -Encoding utf8) } catch { }
 }
 
-function Test-RecentDriftEcho($prNumber) {
+function Test-RecentDriftEcho($prNumber, $type) {
+  # Dedup on (pr_number, result-type). Different mismatch kinds on
+  # the same PR (e.g., title was renamed and now triggers a
+  # different drift class) emit independently so the operator sees
+  # the new state.
   for ($i = $existingTail.Count - 1; $i -ge 0; $i--) {
     $ln = $existingTail[$i]
     if ([string]::IsNullOrWhiteSpace($ln)) { continue }
@@ -162,6 +190,7 @@ function Test-RecentDriftEcho($prNumber) {
       $r = $ln | ConvertFrom-Json -ErrorAction Stop
       if (-not ($r.PSObject.Properties.Name -contains 'event' -and [string]$r.event -eq 'pr-language-mismatch')) { continue }
       if (-not ($r.PSObject.Properties.Name -contains 'pr_number' -and [int]$r.pr_number -eq $prNumber)) { continue }
+      if (-not ($r.PSObject.Properties.Name -contains 'result' -and [string]$r.result -eq $type)) { continue }
       return $true
     } catch { }
   }
@@ -187,7 +216,7 @@ $runId = if ($env:AUTOPILOT_RUN_ID) { $env:AUTOPILOT_RUN_ID } else { '' }
 $emitted = 0
 
 foreach ($d in $drifts) {
-  if (Test-RecentDriftEcho -prNumber $d.pr_number) {
+  if (Test-RecentDriftEcho -prNumber $d.pr_number -type $d.type) {
     Write-Host ("  [{0}] PR #{1}: same drift already in FAILURES tail — skipping" -f $d.type, $d.pr_number)
     continue
   }
@@ -195,7 +224,7 @@ foreach ($d in $drifts) {
     ts        = (Get-Date -Format 'o')
     run_id    = $runId
     event     = 'pr-language-mismatch'
-    result    = 'pr-language-mismatch'
+    result    = $d.type
     pr_number = $d.pr_number
     pr_title  = $d.pr_title
     pr_url    = $d.pr_url

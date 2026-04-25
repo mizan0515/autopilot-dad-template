@@ -129,15 +129,15 @@ function Test-PrTitleLangMismatch {
   param([string]$Title, [string]$OperatorLang)
   if (-not $Title -or -not $OperatorLang) { return $false }
   $primary = ($OperatorLang -split '[-_]')[0].ToLowerInvariant()
-  # CJK operators: warn when title has zero CJK characters (conventional-commit
-  # prefix alone is allowed — we look at the body after the first colon).
-  if ($primary -in 'ko','ja','zh') {
-    $body = $Title
-    if ($Title -match '^[a-z]+(\([^)]+\))?:\s*(.+)$') { $body = $Matches[2] }
-    $hasCjk = ($body -match '[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]')
-    return -not $hasCjk
-  }
-  return $false
+  # Round-7 F73 — bidirectional check. Strip leading conventional-commit
+  # prefix; the body determines mismatch:
+  #   - CJK operator (ko/ja/zh) + body has zero CJK glyphs → mismatch.
+  #   - non-CJK operator (en/...) + body contains CJK glyphs → mismatch.
+  $body = $Title
+  if ($Title -match '^[a-z]+(\([^)]+\))?:\s*(.+)$') { $body = $Matches[2] }
+  $hasCjk = ($body -match '[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]')
+  if ($primary -in 'ko','ja','zh') { return -not $hasCjk }
+  return $hasCjk
 }
 
 function Get-DadReports([int]$Limit = 10) {
