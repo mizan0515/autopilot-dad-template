@@ -308,12 +308,21 @@ if [ -d "$RELAY_STUB" ] && [ "$SLUG" != "myproject" ]; then
   for f in "$RELAY_STUB"/*.json; do
     [ -f "$f" ] || continue
     if grep -q "myproject" "$f" 2>/dev/null; then
-      python3 -c "
+      # Round-3 F32: sed-fallback was `sed -i "s/.../" "$f"` which is GNU-sed
+      # only — macOS BSD sed needs `sed -i '' "..."`. Replaced with POSIX-
+      # portable mktemp + sed-redirect + mv. Also dropped `2>/dev/null` on
+      # the python3 path so genuine errors (file-perm, encoding) surface
+      # instead of silently falling through.
+      if command -v python3 >/dev/null 2>&1; then
+        python3 -c "
 import sys, pathlib
 p = pathlib.Path(sys.argv[1])
 text = p.read_text(encoding='utf-8')
 p.write_text(text.replace('myproject', sys.argv[2]), encoding='utf-8')
-" "$f" "$SLUG" 2>/dev/null || sed -i "s/myproject/${SLUG}/g" "$f" 2>/dev/null || true
+" "$f" "$SLUG"
+      else
+        tmp=$(mktemp) && sed "s/myproject/${SLUG}/g" "$f" > "$tmp" && mv "$tmp" "$f"
+      fi
     fi
   done
   if [ -f "$RELAY_STUB/broker.myproject.json" ] && [ ! -f "$RELAY_STUB/broker.${SLUG}.json" ]; then
