@@ -5,7 +5,11 @@
 # The runner is intentionally dumb. All reasoning lives in PROMPT.md.
 
 $ErrorActionPreference = 'Stop'
-Set-Location (Resolve-Path (Join-Path $PSScriptRoot '..\..'))
+# Round-3 F35: hardcoded `\` separators ('..\..') break on POSIX pwsh because
+# Join-Path emits the literal string verbatim and Resolve-Path then tries to
+# locate `..\..` literally instead of the parent-of-parent dir. PowerShell
+# accepts `/` on Windows too, so `/` everywhere is the cross-platform choice.
+Set-Location (Resolve-Path (Join-Path $PSScriptRoot '../..'))
 
 $root = (Get-Location).Path
 $ap = Join-Path $root '.autopilot'
@@ -13,7 +17,7 @@ $halt = Join-Path $ap 'HALT'
 $delay = Join-Path $ap 'NEXT_DELAY'
 $runnerStatePath = Join-Path $ap 'RUNNER-LIVE.json'
 $projectScript = Join-Path $ap 'project.ps1'
-$promptRelative = if ($env:AUTOPILOT_PROMPT_RELATIVE) { $env:AUTOPILOT_PROMPT_RELATIVE } else { '.autopilot\PROMPT.md' }
+$promptRelative = if ($env:AUTOPILOT_PROMPT_RELATIVE) { $env:AUTOPILOT_PROMPT_RELATIVE } else { '.autopilot/PROMPT.md' }
 
 function Get-WorktreeBase {
   if ($env:AUTOPILOT_WORKTREE_DIR) {
@@ -121,7 +125,7 @@ $ai = $null
 if ($env:AUTOPILOT_AI) {
   $ai = $env:AUTOPILOT_AI
 } else {
-  $cfgPath = Join-Path $PSScriptRoot '..\config.json'
+  $cfgPath = Join-Path $PSScriptRoot '../config.json'
   if (Test-Path $cfgPath) {
     try {
       $cfg = Get-Content -LiteralPath $cfgPath -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
