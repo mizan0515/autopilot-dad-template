@@ -163,7 +163,15 @@ function Get-GateSignals([int]$Tail = 30) {
         }
       }
       $byEvent[$ev].count++
-      if ($row.PSObject.Properties.Name -contains 'ts') { $byEvent[$ev].last_ts = [string]$row.ts }
+      if ($row.PSObject.Properties.Name -contains 'ts') {
+        # F48: ConvertFrom-Json auto-coerces ISO8601 strings to [datetime];
+        # `[string]` cast then renders in current culture (e.g. MM/dd/yyyy on
+        # en-US) which breaks cross-locale dashboards and JS lexicographic
+        # sort. Re-emit in canonical ISO8601 ('o' = round-trip).
+        $tsv = $row.ts
+        if ($tsv -is [datetime]) { $byEvent[$ev].last_ts = $tsv.ToString('o') }
+        else { $byEvent[$ev].last_ts = [string]$tsv }
+      }
       if ($row.PSObject.Properties.Name -contains 'result') { $byEvent[$ev].last_result = [string]$row.result }
     } catch { }
   }
