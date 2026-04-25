@@ -56,6 +56,12 @@ fi
 # low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
 # PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
+# Round-7 F68: long-yellow state aging (soft). Reads
+# .autopilot/long-yellow-contract.json; for each registered field,
+# checks the last (max_unchanged_iters+1) METRICS rows. If they all
+# share the same yellow value, emits long-yellow-state-stuck so the
+# operator dashboard can escalate. Empty manifest checks → silent skip.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-LongYellowState.ps1 -AutopilotRoot .autopilot -Soft
 # Round-7 F67: config-vs-local-tooling drift (soft). Reads
 # .autopilot/config-tooling-contract.json and verifies that any
 # config.json key the operator set explicitly still matches the
