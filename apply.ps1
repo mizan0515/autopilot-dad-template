@@ -153,7 +153,13 @@ try {
       [string[]]$ExcludeRelative = @()
     )
     if (-not (Test-Path $Src)) { return }
-    Get-ChildItem -Path $Src -Recurse -File | ForEach-Object {
+    # `-Force` is required on POSIX (macOS/Linux): without it, Get-ChildItem
+    # skips dotfile directories like `.githooks/`, `.github/`, `.claude/`,
+    # `.agents/`, `.prompts/`. On Windows those are not "hidden" by default so
+    # the bug only fires for Mac/Linux operators — round-7 F63: a Mac
+    # operator's first apply produced no validators chain and no GitHub
+    # workflows, leaving the autopilot disarmed.
+    Get-ChildItem -Path $Src -Recurse -File -Force | ForEach-Object {
       $rel = $_.FullName.Substring($Src.Length + 1)
       # Normalize to forward slashes for cross-platform exclude matching.
       $relNorm = $rel -replace '\\','/'
@@ -367,7 +373,7 @@ try {
   foreach ($rel in $bomPaths) {
     $dir = Join-Path $Target $rel
     if (-not (Test-Path -LiteralPath $dir)) { continue }
-    Get-ChildItem -LiteralPath $dir -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue | ForEach-Object {
+    Get-ChildItem -LiteralPath $dir -Recurse -File -Force -Filter '*.md' -ErrorAction SilentlyContinue | ForEach-Object {
       $b = [System.IO.File]::ReadAllBytes($_.FullName)
       if ($b.Length -lt 3 -or $b[0] -ne 0xEF -or $b[1] -ne 0xBB -or $b[2] -ne 0xBF) {
         $newBytes = New-Object byte[] ($b.Length + 3)
@@ -401,7 +407,7 @@ try {
     # Ensure pre-commit and commit-msg are executable on POSIX checkouts.
     foreach ($hookName in @('pre-commit','commit-msg')) {
       $hp = Join-Path $topHookDir $hookName
-      if ((Test-Path $hp) -and $IsLinux) { & chmod +x $hp 2>$null }
+      if ((Test-Path $hp) -and ($IsLinux -or $IsMacOS)) { & chmod +x $hp 2>$null }
     }
   } elseif (Test-Path $legacyHookDir) {
     git config core.hooksPath .autopilot/hooks
