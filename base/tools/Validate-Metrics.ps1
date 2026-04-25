@@ -33,6 +33,27 @@ $reservedTier3 = @('relay_session_id', 'relay_broker_version', 'relay_turn_index
 
 $lineNo = 0
 $problems = @()
+# Round-6 F53 — METRICS time-monotonicity gate.
+#
+# Real failures observed on `D:\Unity\card game\.autopilot\` (iter 119,
+# 2026-04-25): doctor's auto-repair normalized 14 backwards-going rows
+# in one shot (`metrics-time-regression-normalized`, repair_count=14),
+# AND a separate row showed `build_status_timestamp = 2026-04-25T14:45:00`
+# while the file mtime was 11:38:38 (2h+ in the future).
+#
+# Universal: any append-only telemetry log that's read by dashboards or
+# token-economy gates (F45 reads tail-N to compute window) is corrupted
+# by ts regressions. This applies to Python/web/CLI/embedded as much as
+# to Unity-shaped projects.
+#
+# Two checks:
+#   (1) `ts` strictly non-decreasing line-to-line (within the same file).
+#   (2) `ts` not in the future relative to the validator's wall clock
+#       (with a generous 5-minute skew allowance for clock drift).
+$prevTs = $null
+$prevLineNo = 0
+$nowUtc = [DateTime]::UtcNow
+$futureSkewAllowance = [TimeSpan]::FromMinutes(5)
 
 Get-Content -LiteralPath $Path -Encoding utf8 | ForEach-Object {
   $lineNo++
@@ -50,8 +71,36 @@ Get-Content -LiteralPath $Path -Encoding utf8 | ForEach-Object {
   }
 
   if ($obj.ts) {
-    try { [datetime]::Parse($obj.ts) | Out-Null }
-    catch { $problems += "L${lineNo}: ts='$($obj.ts)' does not parse as ISO-8601" }
+    # Capture the original ISO string from the raw line BEFORE ConvertFrom-Json
+    # coerces it to [datetime] (which would localize it on rendering — the
+    # same F48-class trap). Fall back to $obj.ts ToString() if extraction fails.
+    $tsRaw = $null
+    $tsRawMatch = [regex]::Match($raw, '"ts"\s*:\s*"([^"]+)"')
+    if ($tsRawMatch.Success) { $tsRaw = $tsRawMatch.Groups[1].Value } else { $tsRaw = [string]$obj.ts }
+
+    $parsedTs = $null
+    try {
+      # Use DateTimeOffset to keep timezone awareness; convert to UTC for
+      # comparison. AssumeUniversal handles ts strings without explicit offset.
+      $parsedDto = [DateTimeOffset]::Parse($tsRaw, $null, [System.Globalization.DateTimeStyles]::AssumeUniversal)
+      $parsedTs = $parsedDto.UtcDateTime
+    } catch {
+      $problems += "L${lineNo}: ts='$tsRaw' does not parse as ISO-8601"
+    }
+
+    if ($null -ne $parsedTs) {
+      # F53 (1) — non-decreasing within the file.
+      if ($null -ne $prevTs -and $parsedTs -lt $prevTs) {
+        $problems += "L${lineNo}: ts='$tsRaw' regresses from L${prevLineNo} ts (time monotonicity violated)"
+      } else {
+        $prevTs = $parsedTs
+        $prevLineNo = $lineNo
+      }
+      # F53 (2) — not in the future.
+      if ($parsedTs -gt $nowUtc.Add($futureSkewAllowance)) {
+        $problems += "L${lineNo}: ts='$tsRaw' is in the future relative to wall clock (>5min skew)"
+      }
+    }
   }
 
   if ($ProjectPrefix) {

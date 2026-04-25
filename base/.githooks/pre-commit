@@ -56,3 +56,10 @@ fi
 # low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
 # PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
+# Round-6 F53/F54: METRICS Tier-1 schema + ts monotonicity + Tier-3
+# prefix lint. ProjectPrefix omitted here so the Tier-3 prefix check
+# stays opt-in (set explicitly in project-side hooks once the project
+# slug stabilizes); ts/required-fields/JSON-validity always enforced.
+if [ -f .autopilot/METRICS.jsonl ]; then
+  "$runner" -ExecutionPolicy Bypass -File tools/Validate-Metrics.ps1 -Path .autopilot/METRICS.jsonl
+fi

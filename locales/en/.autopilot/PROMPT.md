@@ -316,6 +316,27 @@ Idle-upkeep and brainstorm passes MUST prioritize these tags over generic `[ux]`
 - Use `base/tools/Write-Utf8NoBom.ps1` / `.sh` for any machine-read JSON / JSONL (METRICS, qa-evidence, RUNNER-LIVE, dispatch reports). PowerShell's default `Out-File` writes UTF-16-LE with BOM and has already corrupted non-ASCII content in other projects. Agent-facing `.md` files keep their UTF-8 BOM per the validator contract.
 - Never use broad `replace_all` or `sed -i` on files containing localized copy. Line-targeted edits with surrounding context only.
 
+### Search hygiene (round-6 F55, applies to every project shape)
+
+When invoking `Grep` / `Glob` / `Agent`, always constrain path to **source roots** (`src/`, `lib/`, `app/`, `Assets/Scripts/`, project-specific code roots) plus intended areas like `tools/` and `.autopilot/`. Never include the directories below in wildcard searches — they're build/cache artifacts that cause token blowup AND poison search results:
+
+| Project shape | Blocked dirs |
+|---|---|
+| Python | `.venv/`, `venv/`, `__pycache__/`, `.tox/`, `.pytest_cache/`, `.mypy_cache/`, `*.egg-info/`, `dist/`, `build/` |
+| Node / JS / TS | `node_modules/`, `dist/`, `build/`, `.next/`, `.nuxt/`, `coverage/`, `.cache/`, `.parcel-cache/` |
+| Rust | `target/` |
+| Go | `vendor/`, `bin/` |
+| Java / JVM | `target/`, `build/`, `out/`, `.gradle/`, `.idea/` |
+| .NET / C# | `bin/`, `obj/`, `packages/`, `.vs/` |
+| Unity | `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `obj/`, unbounded `Packages/` |
+| Unreal | `Binaries/`, `Intermediate/`, `Saved/`, `DerivedDataCache/` |
+| Universal | `.git/`, `.archive/`, `Document/.archive/`, `.autopilot/.archive/` |
+
+Rules:
+1. If any blocked directory shows up in results → immediately narrow path and rerun. Do NOT feed those tokens into the LLM.
+2. Project-specific extensions go in `.autopilot/config.json` `search_blacklist` array (engine-agnostic extension slot).
+3. Time-based git queries: use commit hashes or absolute dates, not relative dates like `"1 week ago"`.
+
 ---
 
 ## Idle upkeep

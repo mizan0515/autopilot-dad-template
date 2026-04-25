@@ -316,6 +316,27 @@ idle-upkeep 과 brainstorm 패스는 일반 `[ux]` / `[content]` / `[dx]` 항목
 - machine-read JSON / JSONL (METRICS, qa-evidence, RUNNER-LIVE, dispatch report) 는 `base/tools/Write-Utf8NoBom.ps1` / `.sh` 를 사용한다. PowerShell 기본 `Out-File` 은 UTF-16-LE + BOM 이라 비 ASCII 를 깨뜨린 이력이 있다. agent-facing `.md` 는 validator 계약대로 UTF-8 BOM 을 유지.
 - 로컬라이즈 카피가 있는 파일에 광범위 `replace_all` · `sed -i` 금지. 주변 맥락이 있는 line-targeted 편집만.
 
+### 검색 규율 (round-6 F55, 모든 프로젝트 형태에 공통)
+
+`Grep` / `Glob` / `Agent` 호출 시 path 를 항상 **소스 루트** (`src/`, `lib/`, `app/`, `Assets/Scripts/`, 프로젝트별 코드 루트) 와 `tools/` · `.autopilot/` 등 의도된 영역으로 한정한다. 다음 디렉토리는 wildcard 탐색에 절대 포함하지 않는다 — 빌드/캐시 산출물이라 토큰 폭발 + 검색 결과 오염을 만든다:
+
+| 프로젝트 형태 | 차단 디렉토리 |
+|---|---|
+| Python | `.venv/`, `venv/`, `__pycache__/`, `.tox/`, `.pytest_cache/`, `.mypy_cache/`, `*.egg-info/`, `dist/`, `build/` |
+| Node / JS / TS | `node_modules/`, `dist/`, `build/`, `.next/`, `.nuxt/`, `coverage/`, `.cache/`, `.parcel-cache/` |
+| Rust | `target/`, `Cargo.lock` (검색 차단; 편집은 별개) |
+| Go | `vendor/`, `bin/` |
+| Java / JVM | `target/`, `build/`, `out/`, `.gradle/`, `.idea/` |
+| .NET / C# | `bin/`, `obj/`, `packages/`, `.vs/` |
+| Unity | `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `obj/`, 무바운드 `Packages/` |
+| Unreal | `Binaries/`, `Intermediate/`, `Saved/`, `DerivedDataCache/` |
+| 공통 | `.git/`, `.archive/`, `Document/.archive/`, `.autopilot/.archive/` |
+
+규칙:
+1. 한 번이라도 위 디렉토리가 결과에 보이면 → 즉시 path narrow 후 재실행. 결과 그대로 사용 금지 (LLM 에 그 토큰을 먹이지 말 것).
+2. 프로젝트 별 추가 차단 목록은 `.autopilot/config.json` 의 `search_blacklist` 배열에 적는다 (engine-agnostic 확장 슬롯).
+3. 시간 기반 git 쿼리 (`git log "1 week ago"`) 는 상대 날짜 대신 commit 해시 또는 절대 날짜를 쓴다.
+
 ---
 
 ## 유휴 정비 (idle-upkeep)
