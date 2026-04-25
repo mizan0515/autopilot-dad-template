@@ -35,9 +35,13 @@ write_runner_state() {
   local run_root="${2:-}"
   local note="${3:-}"
   local last_exit="${4:-0}"
+  # Round-3 F33: `date -Is` is GNU-only. macOS BSD date rejects -Is and the
+  # heredoc would expand to an empty `ts` field, breaking JSON. Use the
+  # POSIX-portable `date -u +%Y-%m-%dT%H:%M:%SZ` which produces a valid
+  # ISO 8601 / RFC 3339 timestamp on both GNU and BSD.
   cat >"$RUNNER_STATE" <<EOF
 {
-  "ts": "$(date -Is)",
+  "ts": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "ai": "$AI",
   "phase": "$phase",
   "run_root": "${run_root//\\/\\\\}",
@@ -153,7 +157,7 @@ while :; do
   ai_exit=0
   llm_timed_out=0
   preflight_failed=0
-  echo "[autopilot] iter start $(date -Is)"
+  echo "[autopilot] iter start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
   # --- Preflight --------------------------------------------------------
   preflight_script="$(cd "$(dirname "$0")" && pwd)/preflight.sh"
