@@ -130,6 +130,49 @@ if ($rowsWithRatioField.Count -ge $NullStreakThreshold) {
   foreach ($r in $tailField) { if ($r.isNumeric) { $allNull = $false; break } }
   if ($allNull) {
     $itersStr = ($tailField | ForEach-Object { $_.iter }) -join ', '
+    # Round-6 F61 — de-dup: skip emission if the null streak hasn't been
+    # interrupted since the last token-telemetry-broken row was emitted.
+    # The streak is a sliding window (iters 4-8 → 5-9 → 6-10 → …) so a
+    # naive observed_iters string-equality check misses the dup. Better
+    # heuristic: if the previous row's max iter is one less than this
+    # row's max iter AND there's been NO numeric cache_read_ratio reading
+    # in between, the streak is the same one — skip.
+    $currentMaxIter = ($tailField | ForEach-Object { $_.iter } | Measure-Object -Maximum).Maximum
+    $skipDup = $false
+    if (Test-Path -LiteralPath $failuresPath) {
+      try {
+        $tailFails = @(Get-Content -LiteralPath $failuresPath -Tail 20 -ErrorAction Stop)
+        for ($idx = $tailFails.Count - 1; $idx -ge 0; $idx--) {
+          $fl = $tailFails[$idx]
+          if ([string]::IsNullOrWhiteSpace($fl)) { continue }
+          try {
+            $fr = $fl | ConvertFrom-Json -ErrorAction Stop
+            if ($fr.PSObject.Properties.Name -contains 'event' -and [string]$fr.event -eq 'token-telemetry-broken') {
+              if ($fr.PSObject.Properties.Name -contains 'observed_iters') {
+                $prevIters = ([string]$fr.observed_iters) -split ',\s*' | ForEach-Object { try { [int]$_ } catch { $null } } | Where-Object { $_ -ne $null }
+                if ($prevIters.Count -gt 0) {
+                  $prevMaxIter = ($prevIters | Measure-Object -Maximum).Maximum
+                  # Same ongoing streak iff (a) previous max is within the current streak window, and
+                  # (b) no numeric reading has appeared since previous emission (which would reset).
+                  $hasNumericSince = $false
+                  foreach ($r in $rowsWithRatioField) {
+                    if ($r.iter -gt $prevMaxIter -and $r.isNumeric) { $hasNumericSince = $true; break }
+                  }
+                  if (-not $hasNumericSince -and $prevMaxIter -le $currentMaxIter -and $prevMaxIter -ge ($currentMaxIter - $NullStreakThreshold + 1)) {
+                    $skipDup = $true
+                  }
+                }
+              }
+              break
+            }
+          } catch { }
+        }
+      } catch { }
+    }
+    if ($skipDup) {
+      Write-Host "[token-economy] telemetry-broken streak still present (iters [$itersStr]) — already logged, skipping duplicate"
+      # exit-clean fall-through — let the threshold check below also run
+    } else {
     $runId = if ($env:AUTOPILOT_RUN_ID) { $env:AUTOPILOT_RUN_ID } else { '' }
     $tnRow = [ordered]@{
       ts                 = (Get-Date -Format 'o')
@@ -144,6 +187,7 @@ if ($rowsWithRatioField.Count -ge $NullStreakThreshold) {
     Write-Host "[token-economy] TELEMETRY-BROKEN — cache_read_ratio null for $NullStreakThreshold consecutive iters [$itersStr]" -ForegroundColor Yellow
     Write-Host "  drift event appended to FAILURES.jsonl"
     if (-not $Soft) { exit 1 }
+    }  # end else (not skipDup)
   }
 }
 
@@ -172,6 +216,33 @@ $runId = if ($env:AUTOPILOT_RUN_ID) { $env:AUTOPILOT_RUN_ID } else { '' }
 $ratiosStr = ($tail | ForEach-Object { '{0:F3}' -f $_.ratio }) -join ', '
 $itersStr  = ($tail | ForEach-Object { $_.iter }) -join ', '
 
+# Round-6 F62 — de-dup: skip emission if the most recent token-economy-drift
+# row in FAILURES tail already records the same observed_iters streak.
+$skipEcho = $false
+if (Test-Path -LiteralPath $failuresPath) {
+  try {
+    $tailFails = @(Get-Content -LiteralPath $failuresPath -Tail 30 -ErrorAction Stop)
+    for ($idx = $tailFails.Count - 1; $idx -ge 0; $idx--) {
+      $fl = $tailFails[$idx]
+      if ([string]::IsNullOrWhiteSpace($fl)) { continue }
+      try {
+        $fr = $fl | ConvertFrom-Json -ErrorAction Stop
+        if ($fr.PSObject.Properties.Name -contains 'event' -and [string]$fr.event -eq 'token-economy-drift') {
+          if ($fr.PSObject.Properties.Name -contains 'observed_iters' -and [string]$fr.observed_iters -eq $itersStr) {
+            $skipEcho = $true
+          }
+          break
+        }
+      } catch { }
+    }
+  } catch { }
+}
+
+if ($skipEcho) {
+  Write-Host "[token-economy] cache-read-ratio drift unchanged (iters [$itersStr]) — already logged, skipping duplicate"
+  if ($Soft) { exit 0 } else { exit 1 }
+}
+
 $row = [ordered]@{
   ts                = (Get-Date -Format 'o')
   run_id            = $runId
@@ -181,7 +252,7 @@ $row = [ordered]@{
   consecutive_count = $ConsecutiveLowThreshold
   observed_ratios   = $ratiosStr
   observed_iters    = $itersStr
-  detail            = "Last $ConsecutiveLowThreshold consecutive METRICS rows with token_economy.cache_read_ratio reported all show ratios below the floor ($CacheReadRatioFloor): [$ratiosStr] for iters [$itersStr]. Per PROMPT.md budget IMMUTABLE rule, this should immediately trigger work reduction + summarization. Operator finding: token pressure without rotation/summary evidence should be treated as a failed run. Recovery: next iter should be doc-only summarization, OR rotate the relay broker session, OR raise the cache hit ratio (e.g. by re-reading the system prompt early so caching actually applies)."
+  detail            = "Last $ConsecutiveLowThreshold consecutive METRICS rows with token_economy.cache_read_ratio reported all show ratios below the floor ($CacheReadRatioFloor): [$ratiosStr] for iters [$itersStr]. Per PROMPT.md budget IMMUTABLE rule, this should immediately trigger work reduction + summarization. Recovery: next iter should be doc-only summarization, OR rotate the relay broker session, OR raise the cache hit ratio (e.g. by re-reading the system prompt early so caching actually applies)."
 }
 $h = @{}
 foreach ($k in $row.Keys) { $h[$k] = $row[$k] }

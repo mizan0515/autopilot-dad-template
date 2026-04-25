@@ -155,7 +155,43 @@ if ($violations.Count -eq 0) {
 
 $runId = if ($env:AUTOPILOT_RUN_ID) { $env:AUTOPILOT_RUN_ID } else { '' }
 
+# Round-6 F62 — de-dup unchanged drift signals.
+# Surfaced by 10-iter dogfood: every pre-commit while HISTORY.md exceeds the
+# soft cap re-emits an identical `size-exceeded` row, polluting the operator
+# dashboard with N copies of the same finding. Universal: any drift validator
+# that re-evaluates a persistent condition. Skip emission when the most
+# recent FAILURES entry for the same `(event, result, lineno)` triple
+# matches what we'd emit now.
+$existingTail = @()
+if (Test-Path -LiteralPath $failuresPath) {
+  try { $existingTail = @(Get-Content -LiteralPath $failuresPath -Tail 30 -ErrorAction Stop) } catch { }
+}
+function Test-RecentDriftEcho($result, $lineno) {
+  # Key on result-type only (not lineno): adding new HISTORY entries shifts
+  # the lineno of every prior entry, so a lineno-keyed de-dup misses the
+  # echo. The semantic "same drift class still present" is what matters
+  # for operator dashboard noise. Different result classes (size-exceeded
+  # vs order-violated vs malformed-header) still emit independently.
+  for ($i = $existingTail.Count - 1; $i -ge 0; $i--) {
+    $ln = $existingTail[$i]
+    if ([string]::IsNullOrWhiteSpace($ln)) { continue }
+    try {
+      $r = $ln | ConvertFrom-Json -ErrorAction Stop
+      if ($r.PSObject.Properties.Name -contains 'event' -and [string]$r.event -eq 'history-invariant-violated' -and
+          $r.PSObject.Properties.Name -contains 'result' -and [string]$r.result -eq $result) {
+        return $true
+      }
+    } catch { }
+  }
+  return $false
+}
+
+$emittedCount = 0
 foreach ($v in $violations) {
+  if (Test-RecentDriftEcho -result $v.type -lineno $v.lineno) {
+    Write-Host ("  [{0}] line {1}: same drift already in FAILURES tail — skipping duplicate" -f $v.type, $v.lineno)
+    continue
+  }
   $row = [ordered]@{
     ts      = (Get-Date -Format 'o')
     run_id  = $runId
@@ -168,6 +204,7 @@ foreach ($v in $violations) {
   $h = @{}
   foreach ($k in $row.Keys) { $h[$k] = $row[$k] }
   Write-DriftRow -Path $failuresPath -Row $h
+  $emittedCount++
 }
 
 Write-Host ""
@@ -175,7 +212,7 @@ Write-Host "[history-invariants] VIOLATIONS DETECTED ($($violations.Count))" -Fo
 foreach ($v in $violations) {
   Write-Host ("  [{0}] line {1}: {2}" -f $v.type, $v.lineno, $v.raw)
 }
-Write-Host "  $($violations.Count) drift event(s) appended to FAILURES.jsonl"
+Write-Host "  $emittedCount drift event(s) appended to FAILURES.jsonl ($($violations.Count - $emittedCount) duplicates skipped)"
 
 if ($Soft) {
   Write-Host ""
