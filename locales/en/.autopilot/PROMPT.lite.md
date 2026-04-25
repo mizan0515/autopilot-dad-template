@@ -46,13 +46,18 @@ If `.autopilot/HALT` exists: do nothing, do not schedule, exit.
 ## Exit contract — lite (IMMUTABLE)
 
 Right after iter start:
-- Write `{pid, started_at, host, prompt: "lite"}` to `.autopilot/LOCK`.
+- Acquire `run_id`: use the environment variable `AUTOPILOT_RUN_ID` if set; otherwise generate a UUID and export it to `$env:AUTOPILOT_RUN_ID`. (The runner sets it per F37.)
+- Write `{pid, started_at, host, run_id, prompt: "lite"}` to `.autopilot/LOCK`.
 
 Right before exiting:
-1. Append one `METRICS.jsonl` line: `{iter, ts, duration_s, outcome: "idle-upkeep|doc-only|escalated", prompt: "lite"}`.
-2. Write next-delay seconds (60–3600) to `NEXT_DELAY`.
-3. Remove `.autopilot/LOCK`.
-4. Touch `.autopilot/LAST_RESCHEDULE`.
+1. Append one `METRICS.jsonl` line: `{iter, ts, run_id, duration_s, outcome: "idle-upkeep|doc-only|escalated", prompt: "lite"}`. **Missing `run_id` violates F38 ledger-consistency / F40 failures-logged contracts.**
+2. If outcome is `escalated`, also append one `FAILURES.jsonl` line with the same `run_id`:
+   `{ts, run_id, event: "lite-escalation", result: "prompt-escalation-required", detail: "<reason>"}` (per F40: non-clean outcomes require a structured FAILURES row. `idle-upkeep` / `doc-only` are clean — no FAILURES row needed.)
+3. Write next-delay seconds (60–3600) to `NEXT_DELAY`.
+4. Remove `.autopilot/LOCK`.
+5. Touch `.autopilot/LAST_RESCHEDULE`.
+
+This lite contract is a **subset** of the full PROMPT.md round-4/5 gates (F37 run_id, F38 ledger, F40 failures-logged) — lite mode does NOT relax those gates. F39 runtime-evidence / F41 DAD report consumption / F45 token-economy are not triggered by lite's allowed work (idle-upkeep / doc-only) and the validators auto-skip.
 <!-- IMMUTABLE:exit-contract-lite:END -->
 
 ---

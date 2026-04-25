@@ -31,6 +31,7 @@ $StatePath = Join-Path $AutopilotRoot 'STATE.md'
 $BacklogPath = Join-Path $AutopilotRoot 'BACKLOG.md'
 $HistoryPath = Join-Path $AutopilotRoot 'HISTORY.md'
 $MetricsPath = Join-Path $AutopilotRoot 'METRICS.jsonl'
+$FailuresPath = Join-Path $AutopilotRoot 'FAILURES.jsonl'
 $DelayPath = Join-Path $AutopilotRoot 'NEXT_DELAY'
 $DashboardJson = Join-Path $AutopilotRoot 'OPERATOR-LIVE.json'
 $DashboardHtml = Join-Path $AutopilotRoot 'OPERATOR-LIVE.html'
@@ -137,6 +138,40 @@ function Test-PrTitleLangMismatch {
   return $false
 }
 
+function Get-GateSignals([int]$Tail = 30) {
+  # Round-5 F47: surface recent FAILURES.jsonl events from the soft-deployed
+  # round-4/5 validators (F38 ledger, F39 runtime-evidence, F40 failures-logged,
+  # F41 dad-report-consumption, F42 history-invariants, F44 stale-state,
+  # F45 token-economy) on the operator dashboard. Groups by `event` field,
+  # returns compact rollup.
+  if (-not (Test-Path -LiteralPath $FailuresPath)) { return @() }
+  try {
+    $lines = @(Get-Content -LiteralPath $FailuresPath -Tail $Tail -ErrorAction Stop)
+  } catch { return @() }
+  $byEvent = @{}
+  foreach ($line in $lines) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    try {
+      $row = $line | ConvertFrom-Json -ErrorAction Stop
+      $ev = if ($row.PSObject.Properties.Name -contains 'event') { [string]$row.event } else { 'unknown' }
+      if (-not $byEvent.ContainsKey($ev)) {
+        $byEvent[$ev] = [ordered]@{
+          event       = $ev
+          count       = 0
+          last_ts     = ''
+          last_result = ''
+        }
+      }
+      $byEvent[$ev].count++
+      if ($row.PSObject.Properties.Name -contains 'ts') { $byEvent[$ev].last_ts = [string]$row.ts }
+      if ($row.PSObject.Properties.Name -contains 'result') { $byEvent[$ev].last_result = [string]$row.result }
+    } catch { }
+  }
+  $out = @()
+  foreach ($k in ($byEvent.Keys | Sort-Object)) { $out += $byEvent[$k] }
+  return $out
+}
+
 function ConvertTo-JsonCompact($obj) {
   return ($obj | ConvertTo-Json -Depth 12 -Compress)
 }
@@ -211,6 +246,7 @@ function Invoke-Status {
     timeline = $timeline
     dad_sessions = $dadOut
     prs = $prOut
+    gate_signals = @(Get-GateSignals -Tail 30)
   }
 
   $json = ConvertTo-JsonCompact $data

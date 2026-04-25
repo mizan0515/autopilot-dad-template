@@ -28,7 +28,10 @@
     "empty_timeline": "No recent activity to show.",
     "empty_prs": "No open auto-PRs right now.",
     "empty_manager_actions": "Nothing for the operator to do right now.",
-    "pr_lang_mismatch": "⚠ title language mismatch"
+    "pr_lang_mismatch": "⚠ title language mismatch",
+    "gate_signals": "🛡 Validator signals",
+    "gate_signals_hint": "Anomalies recently caught by the soft-deployed validators (F38–F45). Empty means all clear.",
+    "empty_gate_signals": "No recent validator alerts."
   },
   "status_labels": {
     "converged": "✅ Talk ended",
