@@ -185,17 +185,46 @@ try {
     Write-Host "[apply] existing config.json preserved at $cfgPath"
   } else {
     New-Item -ItemType Directory -Path (Split-Path $cfgPath -Parent) -Force | Out-Null
+    # Round-3 F17: search_roots used to be a static array containing
+    # `Assets/Scripts`/`Assets/Tests` regardless of project type — Unity-only
+    # entries that were dead weight on a Python or TypeScript repo. Now we
+    # auto-detect: keep the always-present autopilot dirs, and probe a
+    # candidate list for source/test trees that actually exist.
+    $alwaysPresent = @('.autopilot','.agents','.prompts','tools')
+    $candidates    = @('src','lib','tests','test','docs','Document','app','pkg','internal','cmd','Assets/Scripts','Assets/Tests')
+    $detectedRoots = New-Object System.Collections.Generic.List[string]
+    foreach ($c in $candidates) {
+      if (Test-Path (Join-Path $Target $c)) { $detectedRoots.Add($c) | Out-Null }
+    }
+    $searchRoots = @($detectedRoots) + $alwaysPresent
+
+    # Round-3 F15: sensitive_delete_paths used to be implicit (commit-msg
+    # hook hardcoded Unity dirs). Now exposed as config so non-Unity projects
+    # don't get spurious checks against paths that don't exist, and Unity
+    # projects still get protected when those dirs are detected.
+    $sensitive = New-Object System.Collections.Generic.List[string]
+    $sensitive.Add('Document/') | Out-Null  # universal — every DAD project has Document/dialogue/
+    foreach ($u in @('Assets/Scripts/','Assets/Tests/','Assets/Prefabs/')) {
+      $bare = $u.TrimEnd('/')
+      if (Test-Path (Join-Path $Target $bare)) { $sensitive.Add($u) | Out-Null }
+    }
+    foreach ($u in @('src/','lib/','app/','pkg/','internal/','cmd/')) {
+      $bare = $u.TrimEnd('/')
+      if (Test-Path (Join-Path $Target $bare)) { $sensitive.Add($u) | Out-Null }
+    }
+
     $cfg = [ordered]@{
-      project_name        = $Name
-      project_description = $Description
-      product_directive   = $Directive
-      operator_language   = $Language
-      prd_path            = $PrdPath
-      relay_repo_path     = $RelayPath
-      search_roots        = @('src','lib','tests','docs','Document','Assets/Scripts','Assets/Tests','.autopilot','.agents','.prompts','tools')
-      template_version    = $TemplateVersion
-      autopilot_ai        = 'claude'
-      next_delay_default  = 900
+      project_name           = $Name
+      project_description    = $Description
+      product_directive      = $Directive
+      operator_language      = $Language
+      prd_path               = $PrdPath
+      relay_repo_path        = $RelayPath
+      search_roots           = $searchRoots
+      sensitive_delete_paths = $sensitive
+      template_version       = $TemplateVersion
+      autopilot_ai           = 'claude'
+      next_delay_default     = 900
     }
     $json = $cfg | ConvertTo-Json -Depth 5
     [IO.File]::WriteAllText($cfgPath, $json, (New-Object Text.UTF8Encoding $false))
@@ -265,9 +294,11 @@ try {
   if (Test-Path $topHookDir) {
     git config core.hooksPath .githooks
     Write-Host "[apply] hooks registered (core.hooksPath=.githooks)"
-    # Ensure pre-commit is executable on POSIX checkouts.
-    $pre = Join-Path $topHookDir 'pre-commit'
-    if ((Test-Path $pre) -and $IsLinux) { & chmod +x $pre 2>$null }
+    # Ensure pre-commit and commit-msg are executable on POSIX checkouts.
+    foreach ($hookName in @('pre-commit','commit-msg')) {
+      $hp = Join-Path $topHookDir $hookName
+      if ((Test-Path $hp) -and $IsLinux) { & chmod +x $hp 2>$null }
+    }
   } elseif (Test-Path $legacyHookDir) {
     git config core.hooksPath .autopilot/hooks
     Write-Host "[apply] hooks registered (core.hooksPath=.autopilot/hooks)"

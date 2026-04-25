@@ -38,6 +38,17 @@
       "maximum": 3600,
       "default": 900,
       "description": "Default wait seconds between iters when NEXT_DELAY is unset."
+    },
+    "search_roots": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Project tree roots the agent prefers when grepping/globbing. Auto-detected at apply time; hand-edit to add project-specific paths."
+    },
+    "sensitive_delete_paths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Path prefixes whose deletion requires a 'cleanup-operator-approved: yes' commit trailer. Enforced by .autopilot/hooks/commit-msg-protect.sh. Auto-populated at apply time with detected source/test/docs trees; always includes 'Document/' for the DAD dialogue history.",
+      "default": ["Document/"]
     }
   }
 }

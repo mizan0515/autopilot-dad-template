@@ -1,0 +1,22 @@
+#!/usr/bin/env sh
+# .githooks/commit-msg — invokes the autopilot trailer-enforcement hook.
+#
+# Round-3 F18: previously `core.hooksPath=.githooks` was set by apply.{ps1,sh}
+# but `.githooks/commit-msg` did not exist, so the IMMUTABLE-ADD and bulk-
+# delete / sensitive-path trailer gates in `.autopilot/hooks/commit-msg-
+# protect.sh` were never invoked by git. Effect: an agent could silently
+# add new IMMUTABLE blocks or delete protected paths in bulk and the commit
+# would land. This shim fixes that by delegating to the autopilot hook.
+#
+# $1 is the commit-message file path (authoritative for `git commit -m`,
+# unlike .git/COMMIT_EDITMSG which pre-commit sees stale).
+
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+cd "$repo_root"
+
+protect="$repo_root/.autopilot/hooks/commit-msg-protect.sh"
+if [ -f "$protect" ]; then
+  bash "$protect" "$@"
+fi
