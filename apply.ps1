@@ -361,6 +361,37 @@ try {
     Write-Host "[apply] hooks registered (core.hooksPath=.autopilot/hooks)"
   }
 
+  # Round-3 F26: ensure all shipped .sh / hook scripts are stored in the
+  # operator's git index with mode 100755 (executable). On Windows, NTFS
+  # has no exec bit and the default `core.fileMode=false` means `git add`
+  # stages files with mode 100644 regardless. A Windows operator who
+  # commits + pushes the apply'd repo would publish non-executable .sh
+  # scripts; downstream macOS/Linux clones then can't run them without
+  # manual `chmod +x`. `git update-index --add --chmod=+x` sets the index
+  # mode independently of the host filesystem and `core.fileMode`.
+  $execScripts = @(
+    '.githooks/pre-commit',
+    '.githooks/commit-msg',
+    '.autopilot/runners/preflight.sh',
+    '.autopilot/runners/runner.sh',
+    '.autopilot/runners/stalled-fallback.sh',
+    '.autopilot/hooks/commit-msg-protect.sh',
+    '.autopilot/hooks/protect.sh',
+    '.autopilot/hooks/pre-commit',
+    '.autopilot/hooks/commit-msg',
+    'tools/write-utf8-nobom.sh'
+  )
+  Push-Location $Target
+  try {
+    foreach ($rel in $execScripts) {
+      if (Test-Path (Join-Path $Target $rel)) {
+        # First add to the index (no-op if already present); then chmod.
+        & git add --intent-to-add -- $rel 2>$null | Out-Null
+        & git update-index --add --chmod=+x -- $rel 2>$null | Out-Null
+      }
+    }
+  } finally { Pop-Location }
+
   if ($conflictCount -eq 0) {
     if (Test-Path $Conflicts) { Remove-Item $Conflicts -Recurse -Force -ErrorAction SilentlyContinue }
   }

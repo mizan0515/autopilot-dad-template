@@ -334,6 +334,34 @@ elif [ -d "$TARGET/.autopilot/hooks" ]; then
   echo "[apply] hooks registered (core.hooksPath=.autopilot/hooks)"
 fi
 
+# Round-3 F26: ensure all shipped .sh / hook scripts are stored in the
+# operator's git index with mode 100755 (executable). Even though `chmod
+# +x` worked above on POSIX filesystems, when an apply runs on a Windows
+# host (where NTFS has no exec bit and default `core.fileMode=false`),
+# `git add` stages files at 100644. `git update-index --chmod=+x` sets
+# the index mode independently of host fs and core.fileMode, so the
+# operator's eventual `chore: apply` commit publishes correct modes for
+# downstream macOS/Linux clones.
+EXEC_SCRIPTS=(
+  ".githooks/pre-commit"
+  ".githooks/commit-msg"
+  ".autopilot/runners/preflight.sh"
+  ".autopilot/runners/runner.sh"
+  ".autopilot/runners/stalled-fallback.sh"
+  ".autopilot/hooks/commit-msg-protect.sh"
+  ".autopilot/hooks/protect.sh"
+  ".autopilot/hooks/pre-commit"
+  ".autopilot/hooks/commit-msg"
+  "tools/write-utf8-nobom.sh"
+)
+( cd "$TARGET" && for rel in "${EXEC_SCRIPTS[@]}"; do
+    if [ -e "$rel" ]; then
+      git add --intent-to-add -- "$rel" 2>/dev/null || true
+      git update-index --add --chmod=+x -- "$rel" 2>/dev/null || true
+    fi
+  done
+) || true
+
 # --- cleanup --------------------------------------------------------------
 [ "$conflict_count" -eq 0 ] && rmdir "$CONFLICTS" 2>/dev/null || true
 
