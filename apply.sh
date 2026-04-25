@@ -18,6 +18,7 @@ DESC_ARG=""
 DIRECTIVE_ARG=""
 PRD_ARG=""
 RELAY_ARG=""
+AI_ARG=""
 NON_INTERACTIVE=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -27,12 +28,19 @@ while [ $# -gt 0 ]; do
     --directive)   DIRECTIVE_ARG="$2"; shift 2 ;;
     --prd)         PRD_ARG="$2"; shift 2 ;;
     --relay)       RELAY_ARG="$2"; shift 2 ;;
+    --ai)          AI_ARG="$2"; shift 2 ;;
     --yes|-y)      NON_INTERACTIVE=1; shift ;;
     -h|--help)
       sed -n '2,15p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
+
+# Round-3 F20: validate --ai if given; otherwise auto-detect by probing CLIs.
+case "$AI_ARG" in
+  ''|claude|codex|custom) : ;;
+  *) echo "[apply] error: --ai must be one of claude|codex|custom (got: $AI_ARG)" >&2; exit 2 ;;
+esac
 
 TEMPLATE_URL="${AUTOPILOT_TEMPLATE_URL:-https://github.com/mizan0515/autopilot-dad-template.git}"
 TARGET="$(pwd)"
@@ -169,10 +177,24 @@ CFG="$TARGET/.autopilot/config.json"
 if [ -f "$CFG" ]; then
   echo "[apply] existing config.json preserved at $CFG"
 else
+  # F20: resolve autopilot_ai. Priority: --ai → probe CLIs → fallback claude.
+  RESOLVED_AI="$AI_ARG"
+  if [ -z "$RESOLVED_AI" ]; then
+    if command -v claude >/dev/null 2>&1 && claude --version >/dev/null 2>&1; then
+      RESOLVED_AI="claude"
+    elif command -v codex >/dev/null 2>&1 && codex --version >/dev/null 2>&1; then
+      RESOLVED_AI="codex"
+    else
+      RESOLVED_AI="claude"
+      echo "[apply] neither claude nor codex CLI detected on PATH; defaulting autopilot_ai='claude'. Edit .autopilot/config.json after install if you actually use codex."
+    fi
+  fi
+  echo "[apply] autopilot_ai=$RESOLVED_AI"
+
   mkdir -p "$TARGET/.autopilot"
-  python3 - "$CFG" "$TARGET" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" "$PRD_ARG" "$RELAY_ARG" "$TEMPLATE_VERSION" <<'PY'
+  python3 - "$CFG" "$TARGET" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" "$PRD_ARG" "$RELAY_ARG" "$TEMPLATE_VERSION" "$RESOLVED_AI" <<'PY'
 import json, os, sys, pathlib
-path, target, name, desc, directive, lang, prd, relay, tpl_ver = sys.argv[1:]
+path, target, name, desc, directive, lang, prd, relay, tpl_ver, ai = sys.argv[1:]
 
 # Round-3 F17: search_roots used to be a static array including Unity-only
 # `Assets/Scripts`/`Assets/Tests`. Now auto-detect.
@@ -198,7 +220,7 @@ cfg = {
     "search_roots": search_roots,
     "sensitive_delete_paths": sensitive,
     "template_version": tpl_ver,
-    "autopilot_ai": "claude",
+    "autopilot_ai": ai,
     "next_delay_default": 900,
 }
 pathlib.Path(path).write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding='utf-8')
