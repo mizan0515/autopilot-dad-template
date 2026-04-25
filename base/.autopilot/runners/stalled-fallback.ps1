@@ -37,6 +37,10 @@ function Write-MetricsLine {
   param([hashtable]$Row)
   try {
     $Row['ts'] = (Get-Date).ToString('o')
+    # Round-4 F37: stamp run_id (set by runner) so a stalled-fallback
+    # METRICS line can be reconciled with the same iter's RUNNER-LIVE
+    # phase + FAILURES entries.
+    if ($env:AUTOPILOT_RUN_ID) { $Row['run_id'] = $env:AUTOPILOT_RUN_ID }
     if ($Iter -gt 0) { $Row['iter'] = $Iter }
     $line = ($Row | ConvertTo-Json -Compress -Depth 6) + "`n"
     [System.IO.File]::AppendAllText($metricsPath, $line, $utf8NoBomEnc)
@@ -49,6 +53,8 @@ function Write-FailureLine {
   param([hashtable]$Row)
   try {
     $Row['ts'] = (Get-Date).ToString('o')
+    # Round-4 F37: see Write-MetricsLine comment.
+    if ($env:AUTOPILOT_RUN_ID) { $Row['run_id'] = $env:AUTOPILOT_RUN_ID }
     if ($Iter -gt 0) { $Row['iter'] = $Iter }
     $line = ($Row | ConvertTo-Json -Compress -Depth 8) + "`n"
     [System.IO.File]::AppendAllText($failuresPath, $line, $utf8NoBomEnc)

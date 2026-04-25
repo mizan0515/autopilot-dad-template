@@ -96,6 +96,22 @@ Right before exiting, in this order:
 
 ---
 
+## Operational ledger correlation (run_id, round-4 F37)
+
+Every iter's operational ledgers must be bound by a shared `run_id`. The runner generates a UUID at iter start and exposes it as `$env:AUTOPILOT_RUN_ID` (PowerShell) / `$AUTOPILOT_RUN_ID` (bash). The runner then stamps that value into `RUNNER-LIVE.json` and `FAILURES.jsonl` (preflight + stalled-fallback lines).
+
+**When the agent appends its exit-contract METRICS.jsonl line, it MUST include `run_id`**:
+
+```jsonl
+{"ts":"2026-04-25T01:49:25Z","iter":118,"run_id":"4e1b...","tokens":12345,"duration_s":480,"outcome":"shipped","pr_url":"https://..."}
+```
+
+If `$AUTOPILOT_RUN_ID` is empty (manual debug invocation, migration), omit the `run_id` field — do not fabricate a placeholder.
+
+This correlation is the foundation for the future `tools/Validate-LedgerConsistency.ps1` (F38), which will match RUNNER-LIVE's last `run_id` against METRICS/FAILURES tails to detect ledger drift. A real operator failure (round-4 finding): RUNNER-LIVE was stuck at `retained-dirty` while STATE/HISTORY/METRICS advanced through 9 PRs — without `run_id` correlation, downstream consumers couldn't tell which ledger row belonged to which iter, and the inconsistency went unflagged for ~15 hours.
+
+---
+
 ## Prompt economy (lite mode)
 
 For iters whose actual work is small (idle-upkeep, BACKLOG grooming, HISTORY rotation), the full-prompt boot cost dominates. A slim variant lives at `.autopilot/PROMPT.lite.md`. Switch by setting:

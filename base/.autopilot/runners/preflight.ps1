@@ -76,6 +76,10 @@ function Write-FailureLine {
   param([hashtable]$Row)
   try {
     $Row['ts'] = (Get-Date).ToString('o')
+    # Round-4 F37: stamp run_id when set by the runner so this preflight
+    # failure can be ledger-reconciled with the matching RUNNER-LIVE.json
+    # phase entry. Empty string when preflight is invoked standalone.
+    if ($env:AUTOPILOT_RUN_ID) { $Row['run_id'] = $env:AUTOPILOT_RUN_ID }
     $line = ($Row | ConvertTo-Json -Compress -Depth 6) + "`n"
     [System.IO.File]::AppendAllText($failuresPath, $line, $preflightUtf8NoBom)
   } catch { }

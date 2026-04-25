@@ -40,6 +40,11 @@ function Write-RunnerState {
   $state = [ordered]@{
     ts = (Get-Date).ToString('o')
     ai = $ai
+    # Round-4 F37: include run_id so downstream consumers (operator
+    # dashboard, Validate-LedgerConsistency, etc.) can correlate this
+    # phase entry with METRICS.jsonl + FAILURES.jsonl entries from the
+    # same iter. Empty string before the first iter (startup phase).
+    run_id = if ($env:AUTOPILOT_RUN_ID) { $env:AUTOPILOT_RUN_ID } else { '' }
     phase = $Phase
     run_root = $RunRoot
     note = $Note
@@ -188,7 +193,20 @@ while ($true) {
   $aiExitCode = 0
   $llmTimedOut = $false
   $preflightFailed = $false
-  Write-Host "[autopilot] iteration start $($iterStart.ToString('o'))"
+  # Round-4 F37: per-iter `run_id` UUID. This is the correlation key that
+  # binds RUNNER-LIVE.json (current phase), METRICS.jsonl (the agent's
+  # exit-contract line), FAILURES.jsonl (preflight + stall + timeout
+  # records), and the agent's HISTORY.md entry into one ledger row. A
+  # future Validate-LedgerConsistency.ps1 (F38) reads RUNNER-LIVE's last
+  # run_id and confirms METRICS/FAILURES contain a matching entry; a drift
+  # forces the next iter to be recovery, not product.
+  # Operator finding (round-4): RUNNER-LIVE was stuck at retained-dirty
+  # while STATE/HISTORY/METRICS kept advancing through 9 PRs (#299-#307);
+  # without a run_id, downstream consumers couldn't tell which ledger row
+  # belonged to which iter, and the inconsistency went unflagged.
+  $runId = [guid]::NewGuid().ToString()
+  $env:AUTOPILOT_RUN_ID = $runId
+  Write-Host "[autopilot] iteration start $($iterStart.ToString('o')) run_id=$runId"
 
   # --- Preflight: gh auth + AI CLI + git origin ---------------------------
   $autopilotRoot = Split-Path -Parent $PSScriptRoot
@@ -258,8 +276,9 @@ while ($true) {
         $aiExitCode = 124
         try {
           # Round-3 F30: BOM-safe append — see Write-RunnerState comment.
+          # Round-4 F37: include run_id for ledger-reconciliation correlation.
           $failuresPath = Join-Path $autopilotRoot 'FAILURES.jsonl'
-          $failureLine = @{ ts=(Get-Date).ToString('o'); event='llm-timeout'; ai=$ai; timeout_min=$llmTimeoutMin } |
+          $failureLine = @{ ts=(Get-Date).ToString('o'); run_id=$runId; event='llm-timeout'; ai=$ai; timeout_min=$llmTimeoutMin } |
             ConvertTo-Json -Compress
           [System.IO.File]::AppendAllText($failuresPath, $failureLine + "`n", (New-Object System.Text.UTF8Encoding $false))
         } catch { }
@@ -339,8 +358,9 @@ while ($true) {
       Write-Host "[autopilot] $haltReason"
       try {
         # Round-3 F30: BOM-safe append — see Write-RunnerState comment.
+        # Round-4 F37: include run_id for ledger-reconciliation correlation.
         $failuresPath = Join-Path $autopilotRoot 'FAILURES.jsonl'
-        $haltFailureLine = @{ ts=(Get-Date).ToString('o'); event='consecutive-stall-halt'; consecutive=$consecutiveStalls; threshold=$stallHaltThreshold; final_state=$finalState } |
+        $haltFailureLine = @{ ts=(Get-Date).ToString('o'); run_id=$runId; event='consecutive-stall-halt'; consecutive=$consecutiveStalls; threshold=$stallHaltThreshold; final_state=$finalState } |
           ConvertTo-Json -Compress
         [System.IO.File]::AppendAllText($failuresPath, $haltFailureLine + "`n", (New-Object System.Text.UTF8Encoding $false))
       } catch { }

@@ -26,11 +26,16 @@ METRICS="$AUTOPILOT_ROOT/METRICS.jsonl"
 FAILURES="$AUTOPILOT_ROOT/FAILURES.jsonl"
 SNAPSHOT="$AUTOPILOT_ROOT/stalled/$TS"
 
+# Round-4 F37: write_metrics + write_failure stamp run_id (set by parent
+# runner.sh) so stalled-fallback rows can be ledger-reconciled with the
+# same iter's RUNNER-LIVE phase + preflight FAILURES entries.
 write_metrics() {
-  python3 - "$METRICS" "$ITER" "$@" <<'PY' 2>/dev/null || true
+  python3 - "$METRICS" "$ITER" "${AUTOPILOT_RUN_ID:-}" "$@" <<'PY' 2>/dev/null || true
 import sys, json, datetime, os
-path, iter_s, *pairs = sys.argv[1:]
+path, iter_s, run_id, *pairs = sys.argv[1:]
 row = {'ts': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+if run_id:
+    row['run_id'] = run_id
 if iter_s and iter_s != '0':
     row['iter'] = int(iter_s)
 for pair in pairs:
@@ -43,10 +48,12 @@ PY
 }
 
 write_failure() {
-  python3 - "$FAILURES" "$ITER" "$@" <<'PY' 2>/dev/null || true
+  python3 - "$FAILURES" "$ITER" "${AUTOPILOT_RUN_ID:-}" "$@" <<'PY' 2>/dev/null || true
 import sys, json, datetime, os
-path, iter_s, *pairs = sys.argv[1:]
+path, iter_s, run_id, *pairs = sys.argv[1:]
 row = {'ts': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+if run_id:
+    row['run_id'] = run_id
 if iter_s and iter_s != '0':
     row['iter'] = int(iter_s)
 for pair in pairs:
