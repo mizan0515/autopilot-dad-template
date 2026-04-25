@@ -96,6 +96,53 @@ Right before exiting, in this order:
 
 ---
 
+## Token-economy reporting (round-5 F45)
+
+The METRICS.jsonl line may include an optional `token_economy` object. Its fields split into **two groups** with different applicability (round-5 lesson from F39→F43 — be explicit so non-relay projects aren't confused):
+
+### Universal fields (every Claude API workload)
+
+Useful whether you use a DAD relay or not, as long as you call the Claude API directly:
+
+```jsonl
+"token_economy": {
+  "cache_read_ratio"         : 0.42,
+  "cumulative_output_tokens" : 18432
+}
+```
+
+- `cache_read_ratio` — Anthropic prompt-cache read ratio (0.0–1.0). Cache hit fraction.
+- `cumulative_output_tokens` — running output-token total for the iter.
+
+**Core rule** (already in PROMPT.md budget IMMUTABLE; now validator-enforced):
+If `cache_read_ratio < 0.25` for 2+ consecutive iters, immediately shrink scope + force a summarization turn. `tools/Validate-TokenEconomy.ps1` checks the METRICS tail and surfaces drift.
+
+### Relay-only fields (DAD relay in use)
+
+Meaningful only when this project's `config.json.relay_repo_path` is populated and a relay broker mediates peer turns. Non-relay projects must **omit these fields entirely — do not fill with empty placeholders**:
+
+```jsonl
+"token_economy": {
+  "cache_read_ratio"         : 0.42,
+  "cumulative_output_tokens" : 18432,
+  "carry_forward_bytes"      : 1840,
+  "truncation"               : false,
+  "rotation_reason"          : null
+}
+```
+
+- `carry_forward_bytes` — `handoff.context` byte size; compare against broker's `CarryForwardMaxBytes` cap.
+- `truncation` — whether `handoff.context` was clipped at the cap.
+- `rotation_reason` — broker session-rotation cause (`"max_cumulative_output"`, `"low_cache_ratio_2x"`, `"max_turns"`, …). `null` if no rotation occurred.
+
+Operator-reported failure motivating this gate: token-economy data wasn't reaching the operator dashboard, so when token pressure existed there was no way to verify whether rotation/summary actually happened. F45 closes the universal half of that gap — sustained-low `cache_read_ratio` is auto-detected.
+
+### What if my project doesn't use a relay?
+
+Either omit `token_economy` entirely, or report only the universal subset. The validator **skips** rows that don't report `cache_read_ratio` (no false-positive drift). This gate **never forces any project to adopt a relay.**
+
+---
+
 ## DAD report consumption gate (round-4 F41)
 
 The relay (or any external governance system) drops artifacts into `.autopilot/reports/*.json` or `.autopilot/generated/*.json` — files like `relay-manager-signal.json`, `generated-required-evidence-status.json`, `relay-remediation-status.json`. These are **state signals**. When a report's `overall_status` / `status` is one of `blocked`, `governance_blocked`, `stalled`, `missing-evidence`, `action-required`, or its `next_action` is one of `blocked`, `fix_blocker`, `escalate`, `recovery`, **the next iter must consume that report rather than start product work**.

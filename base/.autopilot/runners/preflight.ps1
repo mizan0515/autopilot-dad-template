@@ -267,6 +267,19 @@ if (Test-Path $staleStateValidator) {
   }
 }
 
+# 13. Round-5 F45: token-economy reporting (soft check). Detects
+#     sustained low cache_read_ratio (default: <0.25 for ≥2 consecutive
+#     iters) per PROMPT.md budget IMMUTABLE rule. Skips rows that
+#     don't report cache_read_ratio — non-relay projects are unaffected.
+$tokenEconomyValidator = Join-Path $repoRoot 'tools/Validate-TokenEconomy.ps1'
+if (Test-Path $tokenEconomyValidator) {
+  try {
+    & $tokenEconomyValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] token-economy validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"

@@ -96,6 +96,53 @@ iter 시작 직후:
 
 ---
 
+## 토큰 경제 보고 (round-5 F45)
+
+METRICS.jsonl 라인은 옵션 `token_economy` 객체를 포함할 수 있다. 이 객체의 필드는 **두 그룹** 으로 나뉘며 프로젝트 형태에 따라 채우는 범위가 다르다 (round-5 의 F39→F43 교훈을 반영해 **명확히 구분** 한다).
+
+### 범용 필드 (모든 Claude API 워크로드)
+
+릴레이를 쓰든 안 쓰든, Claude API 를 직접 호출하는 모든 프로젝트에 의미 있다:
+
+```jsonl
+"token_economy": {
+  "cache_read_ratio"         : 0.42,
+  "cumulative_output_tokens" : 18432
+}
+```
+
+- `cache_read_ratio` — Anthropic prompt-cache read ratio (0.0–1.0). 캐시 적중률.
+- `cumulative_output_tokens` — 이번 iter 의 누적 출력 토큰 수.
+
+**핵심 룰** (PROMPT.md budget IMMUTABLE 에 이미 있음, 이제 검증기로 강제):
+연속 2 iter 이상 `cache_read_ratio < 0.25` 면 즉시 작업 축소 + summarization 턴. `tools/Validate-TokenEconomy.ps1` 가 METRICS tail 을 보고 자동 검사한다.
+
+### 릴레이-옵션 필드 (DAD relay 사용 시에만)
+
+이 프로젝트가 `config.json.relay_repo_path` 를 채워서 relay broker 를 쓰는 경우에만 의미 있다. relay 안 쓰면 **이 필드들은 생략한다 — 빈 값으로 채우지 말 것**:
+
+```jsonl
+"token_economy": {
+  "cache_read_ratio"         : 0.42,
+  "cumulative_output_tokens" : 18432,
+  "carry_forward_bytes"      : 1840,
+  "truncation"               : false,
+  "rotation_reason"          : null
+}
+```
+
+- `carry_forward_bytes` — relay handoff.context 의 바이트 크기. broker 의 CarryForwardMaxBytes 캡과 비교.
+- `truncation` — handoff.context 가 캡에 도달해 잘렸는지.
+- `rotation_reason` — broker 가 세션 회전을 한 이유 (`"max_cumulative_output"`, `"low_cache_ratio_2x"`, `"max_turns"`, ...). 회전 안 했으면 `null`.
+
+운영자가 보고한 사고: 토큰 경제 데이터가 운영자 대시보드까지 안 올라와서, token pressure 인데 rotation/summary 가 일어났는지 확인 불가. F45 가 그 갭을 닫는다 — 적어도 `cache_read_ratio` 의 sustained-low 시그널은 자동 감지된다.
+
+### 비-relay 프로젝트는 어떻게 하나
+
+`token_economy` 자체를 생략해도 된다. 또는 범용 두 필드만 적어도 된다. 검증기는 `cache_read_ratio` 가 보고되지 않은 행을 **건너뛴다** (drift 안 생김) — 즉 보고할 데이터가 없는 프로젝트는 영향 없다. 이 게이트는 **어떤 프로젝트도 강제로 relay 를 도입하게 만들지 않는다.**
+
+---
+
 ## DAD 보고서 소비 게이트 (round-4 F41)
 
 릴레이 (또는 외부 governance 시스템) 가 `.autopilot/reports/*.json` 또는 `.autopilot/generated/*.json` 에 남기는 산출물 — `relay-manager-signal.json`, `generated-required-evidence-status.json`, `relay-remediation-status.json` 같은 파일들 — 은 **상태 신호**다. 이 신호의 `overall_status` / `status` 가 `blocked`, `governance_blocked`, `stalled`, `missing-evidence`, `action-required` 중 하나거나, `next_action` 이 `blocked`, `fix_blocker`, `escalate`, `recovery` 중 하나면, **다음 iter 는 제품 작업이 아니라 그 보고서를 소비하는 작업**이어야 한다.
