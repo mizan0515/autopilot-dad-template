@@ -96,6 +96,22 @@ iter 시작 직후:
 
 ---
 
+## DAD 보고서 소비 게이트 (round-4 F41)
+
+릴레이 (또는 외부 governance 시스템) 가 `.autopilot/reports/*.json` 또는 `.autopilot/generated/*.json` 에 남기는 산출물 — `relay-manager-signal.json`, `generated-required-evidence-status.json`, `relay-remediation-status.json` 같은 파일들 — 은 **상태 신호**다. 이 신호의 `overall_status` / `status` 가 `blocked`, `governance_blocked`, `stalled`, `missing-evidence`, `action-required` 중 하나거나, `next_action` 이 `blocked`, `fix_blocker`, `escalate`, `recovery` 중 하나면, **다음 iter 는 제품 작업이 아니라 그 보고서를 소비하는 작업**이어야 한다.
+
+소비란 다음 중 하나:
+1. STATE.md Recent Context 또는 HISTORY.md 항목에 보고서의 `session_id` 또는 파일 basename 을 명시적으로 인용하고, 어떻게 처리할지 (또는 왜 무시할 안전한지) 적는다.
+2. 보고서가 더 이상 actionable 하지 않으면 (예: 다음 보고서로 superseded) `.autopilot/consumed/` 로 옮기고 `consumed-{ts}.json` 메타데이터 파일을 함께 남긴다.
+
+운영자가 보고한 실사용 사고 (round-4): Unity-card-game 의 릴레이는 이미 `unity_mcp_observed` 누락을 `governance_blocked` 로 generated dashboard 에 표시했지만, Unity-side autopilot 은 15시간+ 그 신호를 **소비하지 않았다**. 릴레이가 답을 알고 있었지만 소비 루프가 끊긴 상태. F41 이 그 갭을 닫는다.
+
+`tools/Validate-DadReportConsumption.ps1` 가 이 계약을 강제한다 — 미소비 needs-attention 보고서가 발견되면 같은 `run_id` 의 FAILURES 라인을 추가하고 drift 로 보고한다. soft 모드 에서는 경고만, 향후 hard 모드 에서는 다음 iter 강제 recovery.
+
+소비 우선순위: 한 iter 에 미소비 보고서가 N 개 있으면 가장 오래된 것부터 처리한다 — 새 product PR 을 만들기 전에 모두 소비한다.
+
+---
+
 ## 구조화된 실패 로깅 (round-4 F40)
 
 iter 의 outcome 이 아래 "clean" 집합 밖이라면 — 즉, 정상 종료가 아니라 실패/제외/지연/부분 완료/에스컬레이트 등이라면 — METRICS.jsonl 라인에 outcome 만 적는 것으로 끝내지 말 것. **반드시 같은 `run_id` 를 공유하는 FAILURES.jsonl 라인을 함께 추가**한다. 운영자 대시보드와 reconciliation 게이트는 FAILURES 만 스캔해서 "이 iter 에서 무엇이 잘못됐나" 를 묻는다 — METRICS 만 적고 FAILURES 를 비워두면 그 질문에 답할 수 없다.

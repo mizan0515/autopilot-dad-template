@@ -39,3 +39,9 @@ fi
 # upkeep / bootstrap), expects a same-run_id FAILURES row. -Soft →
 # logged, doesn't block.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-FailuresLogged.ps1 -AutopilotRoot .autopilot -Soft
+# Round-4 F41: DAD report consumption gate (soft). Surfaces relay-
+# dropped reports under .autopilot/reports/ or .autopilot/generated/
+# whose status signals attention but that haven't been consumed
+# (mentioned in STATE/HISTORY tail or moved to consumed/). -Soft →
+# logged.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-DadReportConsumption.ps1 -AutopilotRoot .autopilot -Soft

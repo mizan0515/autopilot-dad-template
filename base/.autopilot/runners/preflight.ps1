@@ -220,6 +220,22 @@ if (Test-Path $failuresValidator) {
   }
 }
 
+# 10. Round-4 F41: DAD report consumption gate (soft check). Scans
+#     `.autopilot/reports/` and `.autopilot/generated/` for relay-
+#     dropped artifacts whose `overall_status`/`status`/`next_action`
+#     signals attention; flags as drift if no recent STATE.md /
+#     HISTORY.md mention. Operator's real Unity-card-game finding:
+#     relay flagged unity_mcp_observed missing for 15h, Unity-side
+#     never consumed.
+$reportConsumptionValidator = Join-Path $repoRoot 'tools/Validate-DadReportConsumption.ps1'
+if (Test-Path $reportConsumptionValidator) {
+  try {
+    & $reportConsumptionValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] dad-report-consumption validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"
