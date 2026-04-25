@@ -1,4 +1,4 @@
-<!-- validate:ignore-refs: Document/.archive/, INDEX.md, .prompts/10-system-doc-sync.md -->
+<!-- validate:ignore-refs: Document/.archive/, INDEX.md, .prompts/10-system-doc-consistency-sync.md -->
 <!-- Project-conditional refs (archive tree, archive INDEX, optional
      system-doc-sync companion prompt) — round-3 F7. -->
 

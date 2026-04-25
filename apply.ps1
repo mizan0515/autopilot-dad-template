@@ -343,6 +343,53 @@ try {
     }
   }
 
+  # --- Round-6 F60: agent-facing markdown BOM normalization -----------------
+  # Real failure surfaced by 10-iter dogfood on en-locale project (D:/dogfood-web):
+  # every iter's pre-commit failed because Validate-Documents.ps1 demands UTF-8
+  # BOM on agent-facing .md files (PROJECT-RULES.md contract), but en source
+  # files in locales/en/.claude/commands/, locales/en/.prompts/, etc. happened
+  # to be saved without BOM. ko-locale projects passed because their source
+  # files happened to have BOM. The apply renderer only adds BOM to files it
+  # placeholder-renders (PROMPT.md / CLAUDE.md / AGENTS.md / etc.); files
+  # that are just copied keep whatever encoding the source has.
+  #
+  # Universal fix: after install, scan every agent-facing .md under the
+  # validator's BOM-required paths and force BOM regardless of source state.
+  # This eliminates the en-vs-ko asymmetry and protects against future
+  # contributors saving locale source files without BOM.
+  $bomPaths = @(
+    '.claude/commands',
+    '.prompts',
+    '.autopilot'  # PROMPT.md / PROMPT.lite.md / BACKLOG.md / PITFALLS.md / etc.
+  )
+  $rootGuides = @('CLAUDE.md','AGENTS.md','PROJECT-RULES.md','DIALOGUE-PROTOCOL.md','RTK.md')
+  $bomBytes = [byte[]](0xEF, 0xBB, 0xBF)
+  foreach ($rel in $bomPaths) {
+    $dir = Join-Path $Target $rel
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    Get-ChildItem -LiteralPath $dir -Recurse -File -Filter '*.md' -ErrorAction SilentlyContinue | ForEach-Object {
+      $b = [System.IO.File]::ReadAllBytes($_.FullName)
+      if ($b.Length -lt 3 -or $b[0] -ne 0xEF -or $b[1] -ne 0xBB -or $b[2] -ne 0xBF) {
+        $newBytes = New-Object byte[] ($b.Length + 3)
+        [Array]::Copy($bomBytes, 0, $newBytes, 0, 3)
+        [Array]::Copy($b, 0, $newBytes, 3, $b.Length)
+        [System.IO.File]::WriteAllBytes($_.FullName, $newBytes)
+      }
+    }
+  }
+  foreach ($g in $rootGuides) {
+    $gp = Join-Path $Target $g
+    if (-not (Test-Path -LiteralPath $gp)) { continue }
+    $b = [System.IO.File]::ReadAllBytes($gp)
+    if ($b.Length -lt 3 -or $b[0] -ne 0xEF -or $b[1] -ne 0xBB -or $b[2] -ne 0xBF) {
+      $newBytes = New-Object byte[] ($b.Length + 3)
+      [Array]::Copy($bomBytes, 0, $newBytes, 0, 3)
+      [Array]::Copy($b, 0, $newBytes, 3, $b.Length)
+      [System.IO.File]::WriteAllBytes($gp, $newBytes)
+    }
+  }
+  Write-Host "[apply] normalized BOM on agent-facing markdown (round-6 F60)"
+
   # --- hooks --------------------------------------------------------------
   # Prefer top-level .githooks/ (canonical validator chain).
   # Fall back to .autopilot/hooks/ for legacy layouts.
