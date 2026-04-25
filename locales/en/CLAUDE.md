@@ -53,7 +53,7 @@ Universal guardrails (always apply):
 
 - Prefer project-native verification (test runner, linter, type checker, integration harness) before broader validation.
 - Judge runtime flow over appearance. A good-looking result with broken flow is a failed result.
-- Watch for wiring, scene/prefab references, input binding, state ownership, and runtime bootstrap gaps.
+- Watch for wiring across project-native abstractions: dependency graph, configuration references, input/event bindings, state ownership boundaries, and runtime bootstrap gaps. (Examples by shape: Python — DI containers + entrypoints; Node — middleware order + config sources; Go — package init order + flag wiring; Unity — scene/prefab references + Inspector wiring; Unreal — Blueprint references; web — bundler entrypoints + CSS module imports.)
 - Never use language like "should work" or "looks fine" as a substitute for verified facts.
 
 ## Git workflow
