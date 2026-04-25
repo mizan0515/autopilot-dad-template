@@ -136,27 +136,31 @@ clean outcome (FAILURES 라인 불필요):
 
 ---
 
-## 런타임 증거 인정 (round-4 F39)
+## 런타임 증거 인정 (round-4 F39, round-5 F43 으로 일반화)
 
-UX 가시 / 런타임 의존 작업 — `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[playmode]`, `[scene]`, `[battle]`, `[gameplay]`, `[e2e]`, `[smoke]` 태그가 BACKLOG 또는 STATE 의 Active Task 에 붙은 iter — 가 `outcome:"shipped"` 를 주장할 때, METRICS.jsonl 라인은 반드시 `runtime_evidence` 객체를 포함한다. 그 객체는 아래 네 필드 중 **최소 하나** 가 비어 있지 않아야 한다:
+이 게이트는 **엔진 무관** 이다. Unity 게임이든, 웹 앱이든, CLI 도구이든, 백엔드 서비스이든, "런타임에서 동작하는 무언가" 를 내놓는 작업은 시각/실행 증거 없이 완료를 주장할 수 없다.
+
+`outcome:"shipped"` 를 주장할 때 BACKLOG 또는 STATE 의 Active Task 에 다음 기본 태그 중 하나라도 붙어 있다면 — `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[e2e]`, `[smoke]` — METRICS.jsonl 라인은 반드시 `runtime_evidence` 객체를 포함한다. 그 객체는 아래 네 필드 중 **최소 하나** 가 비어 있지 않아야 한다:
 
 ```jsonl
 {
   "ts":"2026-04-25T01:49:25Z","iter":118,"run_id":"4e1b...","outcome":"shipped",
   "runtime_evidence": {
-    "screenshot_path"      : ".autopilot/qa-evidence/qa-battle-20260425-123218.png",
-    "smoke_exit_code"      : 0,
-    "mcp_tool_response"    : "Unity MCP play_mode response: 60fps stable",
-    "play_mode_session_id" : "pmsess-2026-04-25-12-32-18"
+    "screenshot_path"    : ".autopilot/qa-evidence/login-screen-20260425.png",
+    "smoke_exit_code"    : 0,
+    "mcp_tool_response"  : "Playwright session: 5/5 selectors found",
+    "runtime_session_id" : "pwsess-2026-04-25-12-32-18"
   }
 }
 ```
 
-각 필드의 의미:
-- `screenshot_path` — 캡처된 화면 (Unity Play Mode, Selenium, Playwright 등). 상대 경로.
-- `smoke_exit_code` — smoke / e2e 테스트 exit code. 0 = pass.
-- `mcp_tool_response` — live MCP tool probe 의 짧은 응답 요약 (Unity MCP, Claude Preview, DB 등).
-- `play_mode_session_id` — Play Mode / 시뮬레이션 세션 식별자.
+각 필드는 프로젝트 도메인에 따라 다른 것을 가리킨다 (필드명은 의도적으로 일반적):
+- `screenshot_path` — 캡처된 화면. 게임이면 Play Mode / 시뮬레이터, 웹이면 Selenium / Playwright, CLI 면 출력 캡처 등. 상대 경로.
+- `smoke_exit_code` — smoke / e2e / unit-smoke 테스트 exit code. 0 = pass.
+- `mcp_tool_response` — live MCP tool 또는 외부 서비스 probe 의 짧은 응답 요약. 어떤 MCP 든, 또는 DB 핑, REST 헬스체크, IDE plugin response 등.
+- `runtime_session_id` — 런타임 세션 식별자 (Play Mode, 브라우저 세션, 시뮬레이터 run, replay ID 등). round-4 에서는 `play_mode_session_id` 였으나 round-5 에서 일반화함.
+
+**프로젝트 전용 태그 추가**: 게임 프로젝트가 `[playmode]`, `[scene]`, `[battle]` 같은 도메인 태그를, 웹 프로젝트가 `[browser]`, `[a11y]` 같은 태그를 추가하고 싶으면 `.autopilot/config.json` 에 `"runtime_evidence_tags": ["[playmode]","[scene]"]` 배열을 추가한다. 검증기가 기본 집합과 합쳐서 사용한다.
 
 운영자가 보고한 실사용 사고 (Unity-card-game): 9 개 PR 이 UX 가시 작업으로 라벨된 채 어떤 런타임 캡처도 없이 머지됐고, STATE/HISTORY 는 "MCP 가 없어서 fresh QA 스크린샷 없음" 을 반복 기록했다. 진짜 원인은 MCP 부재가 아니라 **증거를 요구하는 게이트 자체가 없었던 것**. 이 섹션이 그 게이트의 에이전트-측 계약이고, `tools/Validate-RuntimeEvidence.ps1` 가 강제하는 검사다.
 

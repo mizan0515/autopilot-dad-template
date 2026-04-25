@@ -71,19 +71,37 @@ if (-not (Test-Path -LiteralPath $metricsPath)) {
 
 $utf8NoBom = New-Object System.Text.UTF8Encoding $false
 
-# Tags that mark a task as runtime-required. Operators can extend by
-# editing this validator (or by writing a project-specific shadow
-# validator that wraps this one with their tag set). Conservative
-# default — only the most clearly UX/runtime tags trigger.
+# Round-5 F43: tag set is now engine-agnostic by default. Previously
+# included Unity-specific tags (`[playmode]`, `[scene]`, `[battle]`,
+# `[gameplay]`) which made non-Unity operators (Python, web, CLI)
+# confused about whether the gate applied to them. Default tag list
+# covers any project's runtime-touching surface; operator can extend
+# via `.autopilot/config.json` `runtime_evidence_tags` array (their
+# Unity / Unreal / Godot / domain-specific tags go there).
 $runtimeTags = @(
   '[ui]', '[ux]', '[ux-visible]', '[runtime]',
-  '[playmode]', '[play-mode]', '[scene]',
-  '[battle]', '[gameplay]',
   '[e2e]', '[smoke]'
 )
+$cfgPath = Join-Path $AutopilotRoot 'config.json'
+if (Test-Path -LiteralPath $cfgPath) {
+  try {
+    $cfg = [System.IO.File]::ReadAllText($cfgPath) | ConvertFrom-Json -ErrorAction Stop
+    if ($cfg.PSObject.Properties.Name -contains 'runtime_evidence_tags') {
+      $extra = @($cfg.runtime_evidence_tags)
+      foreach ($t in $extra) {
+        $tt = [string]$t
+        if ($tt -and $runtimeTags -notcontains $tt) { $runtimeTags += $tt }
+      }
+    }
+  } catch { }
+}
 
 # Evidence fields — at least one must be present + non-empty.
-$evidenceFields = @('screenshot_path', 'smoke_exit_code', 'mcp_tool_response', 'play_mode_session_id')
+# Round-5 F43: renamed `play_mode_session_id` → `runtime_session_id`
+# (the prior name implied Unity Play Mode specifically; the new name
+# is project-neutral — covers Selenium/Playwright sessions, simulator
+# runs, replay IDs, anything operators need to point at).
+$evidenceFields = @('screenshot_path', 'smoke_exit_code', 'mcp_tool_response', 'runtime_session_id')
 
 function Get-LastShippedRow {
   param([string]$Path, [int]$Count)
@@ -182,7 +200,7 @@ $row = [ordered]@{
   outcome       = 'shipped'
   triggered_tags = ($triggered -join ' ')
   active_tags    = ($activeTags -join ' ')
-  detail        = "An iter recorded outcome='shipped' on a task tagged with one of the runtime-required tags ($($triggered -join ', ')), but its METRICS row did not include a `runtime_evidence` field with any of: screenshot_path, smoke_exit_code, mcp_tool_response, play_mode_session_id. Operator's real Unity-card-game incident shipped 9 PRs in this state. See AUDIT.md row 81 (F39) for context. To resolve: rerun the iter with a runtime-bridge probe (preflight-runtime-bridge.{ps1,sh}) producing one of the four artifact kinds, or re-tag the task as `[doc-only]` if the work was non-runtime."
+  detail        = "An iter recorded outcome='shipped' on a task tagged with one of the runtime-required tags ($($triggered -join ', ')), but its METRICS row did not include a `runtime_evidence` field with any of: $($evidenceFields -join ', '). Operator's real Unity-card-game incident shipped 9 PRs in this state. See AUDIT.md row 81 (F39) and row 84 (F43 round-5 generalization) for context. To resolve: rerun the iter with a runtime-bridge probe (preflight-runtime-bridge.{ps1,sh}) producing one of the four artifact kinds, or re-tag the task as `[doc-only]` if the work was non-runtime."
 }
 $h = @{}
 foreach ($k in $row.Keys) { $h[$k] = $row[$k] }
@@ -191,7 +209,7 @@ Write-DriftRow -Path $failuresPath -Row $h
 Write-Host ""
 Write-Host "[runtime-evidence] EVIDENCE MISSING" -ForegroundColor Red
 Write-Host "  shipped row run_id='$($row['run_id'])' triggered tags: $($triggered -join ' ')"
-Write-Host "  expected: runtime_evidence.{screenshot_path | smoke_exit_code | mcp_tool_response | play_mode_session_id}"
+Write-Host "  expected: runtime_evidence.{$($evidenceFields -join ' | ')}"
 Write-Host "  drift event appended to FAILURES.jsonl"
 
 if ($Soft) {

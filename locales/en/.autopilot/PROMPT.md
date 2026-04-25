@@ -136,33 +136,37 @@ Operator-reported real failure (round-4): Unity-card-game's `FAILURES.jsonl` was
 
 ---
 
-## Runtime-evidence admission (round-4 F39)
+## Runtime-evidence admission (round-4 F39, generalized in round-5 F43)
 
-When a UX-visible / runtime-touching iter — Active Task carries any of `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[playmode]`, `[scene]`, `[battle]`, `[gameplay]`, `[e2e]`, `[smoke]` — claims `outcome:"shipped"`, the METRICS.jsonl line MUST include a `runtime_evidence` object. At least one of the four fields below must be present and non-empty:
+This gate is **engine-agnostic**. Whether you're shipping a Unity game, a web app, a CLI tool, or a backend service, an iter that produces "something that runs" can't claim completion without visual or executional evidence.
+
+When `outcome:"shipped"` is claimed AND the Active Task in BACKLOG/STATE carries any of the default tags `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[e2e]`, `[smoke]`, the METRICS.jsonl line MUST include a `runtime_evidence` object with at least one non-empty field:
 
 ```jsonl
 {
   "ts":"2026-04-25T01:49:25Z","iter":118,"run_id":"4e1b...","outcome":"shipped",
   "runtime_evidence": {
-    "screenshot_path"      : ".autopilot/qa-evidence/qa-battle-20260425-123218.png",
-    "smoke_exit_code"      : 0,
-    "mcp_tool_response"    : "Unity MCP play_mode response: 60fps stable",
-    "play_mode_session_id" : "pmsess-2026-04-25-12-32-18"
+    "screenshot_path"    : ".autopilot/qa-evidence/login-screen-20260425.png",
+    "smoke_exit_code"    : 0,
+    "mcp_tool_response"  : "Playwright session: 5/5 selectors found",
+    "runtime_session_id" : "pwsess-2026-04-25-12-32-18"
   }
 }
 ```
 
-Field meanings:
-- `screenshot_path` — captured screen (Unity Play Mode, Selenium, Playwright, etc.). Relative path.
-- `smoke_exit_code` — smoke / e2e test exit code. 0 = pass.
-- `mcp_tool_response` — short summary of a live MCP tool probe response (Unity MCP, Claude Preview, DB ping, etc.).
-- `play_mode_session_id` — play-mode / simulation session identifier.
+Field meanings (deliberately generic — fill with whatever your project produces):
+- `screenshot_path` — captured screen. Game = Play Mode / simulator; web = Selenium / Playwright; CLI = output capture. Relative path.
+- `smoke_exit_code` — smoke / e2e / unit-smoke test exit code. 0 = pass.
+- `mcp_tool_response` — short summary of a live MCP tool or external-service probe (any MCP, DB ping, REST healthcheck, IDE-plugin response).
+- `runtime_session_id` — runtime session identifier (Play Mode session, browser session, simulator run, replay ID, etc.). Round-4 shipped this as `play_mode_session_id` but that name implied Unity specifically; round-5 generalized.
 
-Operator-reported real failure (Unity-card-game): 9 PRs were merged labeled UX-visible without any runtime capture. STATE/HISTORY repeatedly logged "MCP가 없어서 fresh QA 스크린샷 없음" — but the real cause wasn't MCP absence; **no gate demanded the evidence at all**. This section is the agent-side contract for that gate; `tools/Validate-RuntimeEvidence.ps1` enforces it.
+**Project-specific tag extension**: Game projects wanting `[playmode]`/`[scene]`/`[battle]` triggers, or web projects wanting `[browser]`/`[a11y]`, add their own tags via `.autopilot/config.json` `"runtime_evidence_tags": ["[playmode]","[scene]"]`. The validator merges them with the default set.
+
+Operator-reported real failure (Unity-card-game, the original motivation): 9 PRs were merged labeled UX-visible without any runtime capture. STATE/HISTORY repeatedly logged "MCP가 없어서 fresh QA 스크린샷 없음" — but the real cause wasn't MCP absence; **no gate demanded the evidence at all**. This section is the agent-side contract; `tools/Validate-RuntimeEvidence.ps1` enforces it.
 
 Iters whose tags are doc-only (`[doc-only]`, `[bootstrap]`, `[idle-upkeep]`) can omit `runtime_evidence` — this gate is tag-driven.
 
-When evidence cannot be produced (preflight-runtime-bridge unresponsive), the agent must record `outcome:"doc-only"` or `outcome:"idle-upkeep"` instead of `shipped`. A `shipped` row with no evidence on a runtime-tagged task is never legitimate.
+When evidence cannot be produced (preflight-runtime-bridge unresponsive), record `outcome:"doc-only"` or `outcome:"idle-upkeep"` instead of `shipped`. A `shipped` row with no evidence on a runtime-tagged task is never legitimate.
 
 ---
 
