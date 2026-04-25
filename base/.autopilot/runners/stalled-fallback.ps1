@@ -27,12 +27,19 @@ $metricsPath = Join-Path $AutopilotRoot 'METRICS.jsonl'
 $failuresPath = Join-Path $AutopilotRoot 'FAILURES.jsonl'
 $snapshotRoot = Join-Path $AutopilotRoot 'stalled'
 
+# Round-3 F30: `Add-Content -Encoding utf8` on Windows PowerShell 5.1 prepends
+# a UTF-8 BOM to the file's first byte. Runtime JSONL must be BOM-less per F25
+# convention (jq parses per-line; BOM at byte 0 breaks the first parse). Use
+# explicit UTF8Encoding($false) for cross-version safety.
+$utf8NoBomEnc = New-Object System.Text.UTF8Encoding $false
+
 function Write-MetricsLine {
   param([hashtable]$Row)
   try {
     $Row['ts'] = (Get-Date).ToString('o')
     if ($Iter -gt 0) { $Row['iter'] = $Iter }
-    ($Row | ConvertTo-Json -Compress -Depth 6) | Add-Content -Path $metricsPath -Encoding utf8
+    $line = ($Row | ConvertTo-Json -Compress -Depth 6) + "`n"
+    [System.IO.File]::AppendAllText($metricsPath, $line, $utf8NoBomEnc)
   } catch {
     Write-Host "[stalled-fallback] metrics write failed: $_"
   }
@@ -43,7 +50,8 @@ function Write-FailureLine {
   try {
     $Row['ts'] = (Get-Date).ToString('o')
     if ($Iter -gt 0) { $Row['iter'] = $Iter }
-    ($Row | ConvertTo-Json -Compress -Depth 8) | Add-Content -Path $failuresPath -Encoding utf8
+    $line = ($Row | ConvertTo-Json -Compress -Depth 8) + "`n"
+    [System.IO.File]::AppendAllText($failuresPath, $line, $utf8NoBomEnc)
   } catch {
     Write-Host "[stalled-fallback] failures write failed: $_"
   }

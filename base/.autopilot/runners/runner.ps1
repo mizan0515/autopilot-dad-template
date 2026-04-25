@@ -43,7 +43,14 @@ function Write-RunnerState {
     worktree_base = (Get-WorktreeBase)
   }
 
-  ($state | ConvertTo-Json -Depth 4) | Set-Content -Path $runnerStatePath -Encoding utf8
+  # Round-3 F30: `-Encoding utf8` on Windows PowerShell 5.1 writes UTF-8 WITH
+  # BOM. Runtime JSON / JSONL across the template is BOM-less per F25
+  # convention; PS5.1 BOM here breaks `jq` parsing of RUNNER-LIVE.json
+  # downstream. Use [IO.File]::WriteAllText with explicit UTF8Encoding($false)
+  # for cross-version safety (works on both Windows PowerShell 5.1 and
+  # PowerShell 7+).
+  $stateJson = $state | ConvertTo-Json -Depth 4
+  [System.IO.File]::WriteAllText($runnerStatePath, $stateJson, (New-Object System.Text.UTF8Encoding $false))
   # Round-3 F23: this used to call `status-kr -RunRoot $RunRoot -Phase $Phase
   # -Note $Note -ExitCode $LastExitCode`, but project.ps1's ValidateSet does
   # NOT include `status-kr` and it has no -RunRoot / -Phase / -Note /
@@ -233,9 +240,11 @@ while ($true) {
         $llmTimedOut = $true
         $aiExitCode = 124
         try {
+          # Round-3 F30: BOM-safe append — see Write-RunnerState comment.
           $failuresPath = Join-Path $autopilotRoot 'FAILURES.jsonl'
-          @{ ts=(Get-Date).ToString('o'); event='llm-timeout'; ai=$ai; timeout_min=$llmTimeoutMin } |
-            ConvertTo-Json -Compress | Add-Content -Path $failuresPath -Encoding utf8
+          $failureLine = @{ ts=(Get-Date).ToString('o'); event='llm-timeout'; ai=$ai; timeout_min=$llmTimeoutMin } |
+            ConvertTo-Json -Compress
+          [System.IO.File]::AppendAllText($failuresPath, $failureLine + "`n", (New-Object System.Text.UTF8Encoding $false))
         } catch { }
       } else {
         Receive-Job -Job $job -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_ }
@@ -312,9 +321,11 @@ while ($true) {
       Set-Content -Path $halt -Value $haltReason -Encoding utf8
       Write-Host "[autopilot] $haltReason"
       try {
+        # Round-3 F30: BOM-safe append — see Write-RunnerState comment.
         $failuresPath = Join-Path $autopilotRoot 'FAILURES.jsonl'
-        @{ ts=(Get-Date).ToString('o'); event='consecutive-stall-halt'; consecutive=$consecutiveStalls; threshold=$stallHaltThreshold; final_state=$finalState } |
-          ConvertTo-Json -Compress | Add-Content -Path $failuresPath -Encoding utf8
+        $haltFailureLine = @{ ts=(Get-Date).ToString('o'); event='consecutive-stall-halt'; consecutive=$consecutiveStalls; threshold=$stallHaltThreshold; final_state=$finalState } |
+          ConvertTo-Json -Compress
+        [System.IO.File]::AppendAllText($failuresPath, $haltFailureLine + "`n", (New-Object System.Text.UTF8Encoding $false))
       } catch { }
       Write-RunnerState -Phase 'halted' -Note $haltReason -LastExitCode $aiExitCode
       break
