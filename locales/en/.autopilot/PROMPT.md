@@ -96,6 +96,30 @@ Right before exiting, in this order:
 
 ---
 
+## Structured failure logging (round-4 F40)
+
+If an iter's `outcome` is outside the "clean" set below — i.e. it failed, was excluded, deferred, partial, escalated, etc. — recording only the METRICS row is not enough. **You must also append a FAILURES.jsonl row sharing the same `run_id`**. The operator dashboard and reconciliation gates scan FAILURES to answer "what went wrong on this iter?" — leaving FAILURES empty makes that question unanswerable.
+
+Clean outcomes (no FAILURES row required):
+- `shipped` — code change actually deployed
+- `doc-only` — docs / metadata only
+- `idle-upkeep` — maintenance turn (PR sweep, BACKLOG grooming)
+- `bootstrap` — iter 0 bootstrap
+
+Every other outcome (`excluded`, `blocked`, `escalated`, `partial`, `deferred`, `error`, `aborted`, `halted`, `abandoned`, `recovery`, or anything else) must come with a FAILURES.jsonl row:
+
+```jsonl
+{"ts":"2026-04-25T14:00:00Z","run_id":"4e1b...","iter":118,"event":"outcome-non-clean","outcome":"blocked","reason":"Unity MCP runtime-bridge unresponsive; UX-visible task cannot satisfy F39 evidence gate","next_action":"escalate-to-operator"}
+```
+
+The `event` field should be specific — `outcome-non-clean` is the fallback; prefer domain events like `runtime-bridge-unresponsive`, `ledger-drift-detected`, `peer-handoff-failed`, `evidence-missing`. The `reason` should be a single line the operator can read and immediately understand.
+
+Operator-reported real failure (round-4): Unity-card-game's `FAILURES.jsonl` was **empty** — even though the runner had been stuck at `retained-dirty` for 15 hours, draft PR #292 was languishing, and Unity-MCP went unobserved across 9 PRs. Real failures existed; they just weren't being written to the structured ledger, so downstream tools had nothing to triage. F40 closes that gap.
+
+`tools/Validate-FailuresLogged.ps1` enforces this contract — when the most recent METRICS row's outcome is non-clean and no FAILURES row shares its run_id, drift is reported.
+
+---
+
 ## Runtime-evidence admission (round-4 F39)
 
 When a UX-visible / runtime-touching iter — Active Task carries any of `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[playmode]`, `[scene]`, `[battle]`, `[gameplay]`, `[e2e]`, `[smoke]` — claims `outcome:"shipped"`, the METRICS.jsonl line MUST include a `runtime_evidence` object. At least one of the four fields below must be present and non-empty:

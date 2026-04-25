@@ -34,3 +34,8 @@ fi
 # METRICS row has no `runtime_evidence` field. -Soft → logged, doesn't
 # block (initial deployment).
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-RuntimeEvidence.ps1 -AutopilotRoot .autopilot -Soft
+# Round-4 F40: structured-failure-logging soft check. When the last
+# METRICS row outcome is non-clean (not shipped / doc-only / idle-
+# upkeep / bootstrap), expects a same-run_id FAILURES row. -Soft →
+# logged, doesn't block.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-FailuresLogged.ps1 -AutopilotRoot .autopilot -Soft
