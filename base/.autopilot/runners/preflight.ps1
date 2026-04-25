@@ -236,6 +236,21 @@ if (Test-Path $reportConsumptionValidator) {
   }
 }
 
+# 11. Round-5 F42: HISTORY.md invariants (soft check). Validates entries
+#     are newest-first, no duplicate iter numbers, ≤10 visible entries
+#     before .archive/ rotation. Operator's Unity-card-game finding:
+#     entries appeared as 111→113→10898→114-118 (out-of-order + a
+#     corrupted "10898" header) while the file claimed "newest first,
+#     keep last 10".
+$historyValidator = Join-Path $repoRoot 'tools/Validate-HistoryInvariants.ps1'
+if (Test-Path $historyValidator) {
+  try {
+    & $historyValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] history-invariants validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"

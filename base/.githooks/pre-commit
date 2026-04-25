@@ -45,3 +45,6 @@ fi
 # (mentioned in STATE/HISTORY tail or moved to consumed/). -Soft →
 # logged.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-DadReportConsumption.ps1 -AutopilotRoot .autopilot -Soft
+# Round-5 F42: HISTORY.md invariants (soft). Surfaces ordering
+# violations, duplicate iters, malformed headers, size cap exceeded.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-HistoryInvariants.ps1 -AutopilotRoot .autopilot -Soft
