@@ -1,5 +1,8 @@
-﻿<!-- validate:ignore-refs: tools/Write-DadDashboard.ps1 -->
-<!-- Optional dashboard writer; not shipped with every template apply (round-3 F7). -->
+﻿<!-- Dashboard pipeline (round-5 F49): Show-DadDashboard.ps1 delegates to
+     .autopilot/project.ps1 status, which writes OPERATOR-LIVE.{json,html}.
+     OPERATOR-LIVE.html includes both the DAD sessions panel and (round-5
+     F47) the validator-signals panel — superset of the legacy
+     DASHBOARD-LIVE artifacts. There is no separate Write-DadDashboard.ps1. -->
 
 # Document/dialogue/ — DAD v2 runtime directory
 
@@ -67,8 +70,7 @@ The `{lang}` placeholder is replaced with the operator language at apply time (e
 
 - New session: `tools/New-DadSession.ps1` — creates session directory and initial `state.json`.
 - New turn: `tools/New-DadTurn.ps1` — generates the next `turn-{N}.yaml` skeleton.
-- Dashboard refresh: `tools/Write-DadDashboard.ps1` — reads the active session and writes `DASHBOARD-LIVE.{lang}.{json,html}`.
-- Open dashboard: `tools/Show-DadDashboard.ps1` — regenerates then opens.
+- Dashboard refresh + open: `tools/Show-DadDashboard.ps1 -Root .` — delegates to `.autopilot/project.ps1 status`, which writes `OPERATOR-LIVE.{json,html}` (includes DAD-sessions panel + validator-signals panel). Pass `-NoOpen` to skip launching the browser.
 - Validator set (the `.githooks/pre-commit` hook runs the same chain):
   - `tools/Validate-Documents.ps1 -Root . -IncludeRootGuides -IncludeAgentDocs -Fix`
   - `tools/Validate-CodexSkillMetadata.ps1 -RepoRoot .`
