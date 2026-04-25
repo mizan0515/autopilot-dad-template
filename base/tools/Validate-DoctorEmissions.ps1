@@ -97,12 +97,39 @@ $defaultEventPatterns = @('^doctor-', '^auto-repair-', '-normalized$')
 $sourceValues = @($defaultSourceValues + $extraSourceValues | Sort-Object -Unique)
 $eventPatterns = @($defaultEventPatterns + $extraEventPatterns | Sort-Object -Unique)
 
-# Validator-own emission events that the regex would otherwise match
-# (this validator's own `doctor-emission-missing-run-id` starts with
-# `doctor-`, which would self-trigger and classify previous drift rows
-# as fresh doctor emissions). Any row whose event is in this list is
-# explicitly NOT a doctor-origin row.
-$validatorOwnEvents = @('doctor-emission-missing-run-id')
+# Sibling-validator emission events that the regex/source filters would
+# otherwise re-classify as doctor-origin. Two distinct risks:
+#   1. This validator's own `doctor-emission-missing-run-id` starts with
+#      `doctor-` and self-matches the default regex (round-7 F69 fix).
+#   2. Pre-commit context often runs without `$AUTOPILOT_RUN_ID` set, so
+#      sibling validators (state-timestamp, upstream-contract, config-
+#      tooling, long-yellow, pr-language, etc.) emit drift rows with an
+#      empty `run_id`. If an operator extends `doctor_origin_extra_event_
+#      patterns` with anything broad enough (e.g. `-drift$`, `-mismatch$`,
+#      `-stuck$`), those sibling rows would be re-classified here and
+#      re-emitted on every commit — a self-recursive false-positive
+#      storm across validators (round-8 F74 hardening).
+# Any row whose event is in this list is explicitly NOT doctor-origin,
+# regardless of how broad the regex/source list grows.
+$validatorOwnEvents = @(
+  'doctor-emission-missing-run-id',
+  # round-7 sibling validators
+  'state-timestamp-drift',
+  'upstream-contract-drift',
+  'config-tooling-drift',
+  'long-yellow-state-stuck',
+  'pr-language-mismatch',
+  'dad-report-unconsumed',
+  # round-3..6 sibling validators
+  'metrics-schema-drift',
+  'token-economy-drift',
+  'token-telemetry-broken',
+  'ledger-drift',
+  'failures-row-missing',
+  'runtime-evidence-missing',
+  'history-invariant-violated',
+  'stale-state-detected'
+)
 
 function Test-DoctorOrigin($row) {
   if ($row.PSObject.Properties.Name -contains 'event') {
