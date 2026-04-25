@@ -140,6 +140,112 @@ function Test-PrTitleLangMismatch {
   return $false
 }
 
+function Get-DadReports([int]$Limit = 10) {
+  # Round-7 F71: surface .autopilot/reports/*.json and
+  # .autopilot/generated/*.json on the operator dashboard so the
+  # operator can see at a glance which DAD reports are awaiting
+  # consumption. F41 (Validate-DadReportConsumption) already emits
+  # `dad-report-unconsumed` drift events; this function gives them a
+  # dedicated panel rather than burying them in the gate-signals
+  # rollup. Mirrors F41's vocabulary so the displayed `attention`
+  # flag matches what the validator would flag.
+  $reportDirs = @(
+    (Join-Path $AutopilotRoot 'reports'),
+    (Join-Path $AutopilotRoot 'generated')
+  )
+  $consumedDir = Join-Path $AutopilotRoot 'consumed'
+  $statePath   = Join-Path $AutopilotRoot 'STATE.md'
+  $historyPath = Join-Path $AutopilotRoot 'HISTORY.md'
+
+  $attentionStatuses = @(
+    'blocked', 'governance_blocked', 'stalled',
+    'missing-evidence', 'action-required', 'unconsumed',
+    'fail', 'failed', 'fail_closed'
+  )
+  $attentionActions = @(
+    'blocked', 'fix_blocker', 'escalate', 'recovery',
+    'escalate-to-operator', 'unblock-required'
+  )
+
+  $stateTail = ''
+  $historyTail = ''
+  if (Test-Path -LiteralPath $statePath) {
+    try { $stateTail = (@(Get-Content -LiteralPath $statePath -Tail 200 -ErrorAction Stop) -join "`n") } catch { }
+  }
+  if (Test-Path -LiteralPath $historyPath) {
+    try { $historyTail = (@(Get-Content -LiteralPath $historyPath -Tail 200 -ErrorAction Stop) -join "`n") } catch { }
+  }
+
+  $items = @()
+  foreach ($dir in $reportDirs) {
+    if (-not (Test-Path -LiteralPath $dir)) { continue }
+    try {
+      Get-ChildItem -LiteralPath $dir -Filter '*.json' -File -ErrorAction Stop -Force | ForEach-Object {
+        $items += $_
+      }
+    } catch { }
+  }
+  if ($items.Count -eq 0) { return @() }
+
+  # Sort by mtime desc, take Limit
+  $items = $items | Sort-Object -Property LastWriteTimeUtc -Descending | Select-Object -First $Limit
+
+  $out = @()
+  foreach ($f in $items) {
+    $doc = $null
+    try { $doc = [System.IO.File]::ReadAllText($f.FullName) | ConvertFrom-Json -ErrorAction Stop } catch { }
+
+    # Detect attention reason via F41 vocab.
+    $reason = ''
+    if ($doc) {
+      $candidates = @(
+        @{ Field = 'overall_status'; Vocab = $attentionStatuses },
+        @{ Field = 'status';         Vocab = $attentionStatuses },
+        @{ Field = 'next_action';    Vocab = $attentionActions  }
+      )
+      foreach ($c in $candidates) {
+        if ($doc.PSObject.Properties.Name -notcontains $c.Field) { continue }
+        $val = [string]$doc.($c.Field)
+        if (-not $val) { continue }
+        if ($c.Vocab -contains $val.ToLowerInvariant()) {
+          $reason = ('{0}={1}' -f $c.Field, $val)
+          break
+        }
+      }
+    }
+
+    # Detect consumed: file lives under .autopilot/consumed/, OR STATE/HISTORY
+    # tail mentions the session_id / basename.
+    $rel = $f.FullName.Replace('\','/')
+    $consumed = $false
+    if ($rel -match '/consumed/') {
+      $consumed = $true
+    } else {
+      $sessionId = ''
+      if ($doc -and $doc.PSObject.Properties.Name -contains 'session_id') { $sessionId = [string]$doc.session_id }
+      $basename = [IO.Path]::GetFileNameWithoutExtension($f.Name)
+      foreach ($needle in @($sessionId, $basename)) {
+        if (-not $needle) { continue }
+        if (($stateTail -and $stateTail.Contains($needle)) -or ($historyTail -and $historyTail.Contains($needle))) {
+          $consumed = $true
+          break
+        }
+      }
+    }
+
+    $needsAttention = ([bool]$reason) -and (-not $consumed)
+
+    $out += [ordered]@{
+      file        = $f.Name
+      mtime       = $f.LastWriteTimeUtc.ToString('o')
+      reason      = $reason
+      consumed    = $consumed
+      attention   = $needsAttention
+    }
+  }
+  return $out
+}
+
 function Get-GateSignals([int]$Tail = 30) {
   # Round-5 F47: surface recent FAILURES.jsonl events from the soft-deployed
   # round-4/5 validators (F38 ledger, F39 runtime-evidence, F40 failures-logged,
@@ -257,6 +363,7 @@ function Invoke-Status {
     dad_sessions = $dadOut
     prs = $prOut
     gate_signals = @(Get-GateSignals -Tail 30)
+    dad_reports  = @(Get-DadReports -Limit 10)
   }
 
   $json = ConvertTo-JsonCompact $data
