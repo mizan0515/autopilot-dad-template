@@ -99,7 +99,12 @@ handoff:
   done_reason: ""
 "@
 
-$enc = New-Object System.Text.UTF8Encoding($true)
+# Round-3 F25: turn-{N}.yaml is runtime YAML consumed by Validate-DadPacket
+# and the dialogue tooling — must be UTF-8 NO BOM. Most YAML parsers (PyYAML
+# default, ruamel without explicit BOM-aware mode) raise ScannerError or
+# treat the BOM as part of the first key. Same convention as state.json
+# below: runtime serialization strips BOM, agent-facing markdown keeps it.
+$enc = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($targetPath, $yaml, $enc)
 
 $relative = $targetPath.Substring($resolvedRoot.Length + 1).Replace('\', '/')
