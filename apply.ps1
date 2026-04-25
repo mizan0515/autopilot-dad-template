@@ -251,8 +251,16 @@ try {
     }
     Write-Host "[apply] autopilot_ai=$resolvedAi"
 
+    # Round-7 F66: derive a stable lowercase slug from $Name and persist
+    # it as `project_slug` in config.json. Validate-Metrics.ps1 reads this
+    # to enforce the Tier-3 extension-key prefix lint without operators
+    # having to remember to pass `-ProjectPrefix` on every commit.
+    $cfgSlug = ($Name.ToLowerInvariant() -replace '[^a-z0-9-]', '-').Trim('-')
+    if (-not $cfgSlug) { $cfgSlug = 'myproject' }
+
     $cfg = [ordered]@{
       project_name           = $Name
+      project_slug           = $cfgSlug
       project_description    = $Description
       product_directive      = $Directive
       operator_language      = $Language
