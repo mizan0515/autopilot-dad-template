@@ -96,6 +96,22 @@ Right before exiting, in this order:
 
 ---
 
+## DAD report consumption gate (round-4 F41)
+
+The relay (or any external governance system) drops artifacts into `.autopilot/reports/*.json` or `.autopilot/generated/*.json` — files like `relay-manager-signal.json`, `generated-required-evidence-status.json`, `relay-remediation-status.json`. These are **state signals**. When a report's `overall_status` / `status` is one of `blocked`, `governance_blocked`, `stalled`, `missing-evidence`, `action-required`, or its `next_action` is one of `blocked`, `fix_blocker`, `escalate`, `recovery`, **the next iter must consume that report rather than start product work**.
+
+Consumption means one of:
+1. Quote the report's `session_id` or file basename explicitly in STATE.md Recent Context or a HISTORY.md entry, and record how it will be handled (or why it's safe to ignore).
+2. If the report is no longer actionable (e.g., superseded by a newer report), move it to `.autopilot/consumed/` along with a `consumed-{ts}.json` metadata file.
+
+Operator-reported real failure (round-4): Unity-card-game's relay had already flagged `unity_mcp_observed` missing in its generated dashboard with `overall_status: governance_blocked`, but Unity-side autopilot **never consumed** that signal for 15+ hours. The relay knew the answer; the consumption loop was broken. F41 closes that gap.
+
+`tools/Validate-DadReportConsumption.ps1` enforces — unconsumed needs-attention reports trigger a same-run_id FAILURES row and drift report. Soft mode warns; future hard mode will force a recovery iter.
+
+Consumption priority: when N unconsumed reports exist, process the oldest first — clear them all before opening new product PRs.
+
+---
+
 ## Structured failure logging (round-4 F40)
 
 If an iter's `outcome` is outside the "clean" set below — i.e. it failed, was excluded, deferred, partial, escalated, etc. — recording only the METRICS row is not enough. **You must also append a FAILURES.jsonl row sharing the same `run_id`**. The operator dashboard and reconciliation gates scan FAILURES to answer "what went wrong on this iter?" — leaving FAILURES empty makes that question unanswerable.
