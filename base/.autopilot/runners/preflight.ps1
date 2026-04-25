@@ -177,6 +177,21 @@ if (Test-Path $bridgeHook) {
   }
 }
 
+# 7. Round-4 F38: ledger reconciliation (soft check). Reads RUNNER-LIVE
+#    last phase + run_id and confirms a matching row exists in METRICS or
+#    FAILURES tail. On drift: appends a `ledger-drift` event to FAILURES
+#    .jsonl and prints a structured diagnostic, but does not abort the
+#    iter — operator dashboard surfaces the event.
+$repoRoot = (Split-Path -Parent $AutopilotRoot)
+$ledgerValidator = Join-Path $repoRoot 'tools/Validate-LedgerConsistency.ps1'
+if (Test-Path $ledgerValidator) {
+  try {
+    & $ledgerValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] ledger validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"

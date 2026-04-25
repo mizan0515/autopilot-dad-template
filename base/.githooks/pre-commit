@@ -23,3 +23,9 @@ fi
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-DadDecisionWorkflow.ps1 -Root .
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-DadPacket.ps1 -Root . -AllSessions
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-ImmutableBlocks.ps1 -Root .
+# Round-4 F38: ledger consistency soft check. Surfaces drift between
+# RUNNER-LIVE.json's last phase and METRICS/FAILURES tail rows that
+# share the same run_id (F37). -Soft → drift logged but doesn't block
+# the commit, since the most common drift cause is a previous runner
+# crash that the agent's current commit may itself be repairing.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-LedgerConsistency.ps1 -AutopilotRoot .autopilot -Soft
