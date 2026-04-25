@@ -21,6 +21,14 @@ param(
   [string]$Directive = '',
   [string]$PrdPath = '',
   [string]$RelayPath = '',
+  # Round-3 F20: autopilot_ai used to be hardcoded `claude` in the generated
+  # config.json, ignoring whatever CLI the operator actually has installed.
+  # After F14 made runner/preflight read this value, an operator with only
+  # Codex got a permanently-failing preflight. Now: empty default → auto-
+  # detect by probing `claude --version` and `codex --version`, preferring
+  # claude when both are present (matches BOOTSTRAP.md Step 2). Operator can
+  # override with `-Ai claude|codex|custom`.
+  [ValidateSet('','claude','codex','custom')][string]$Ai = '',
   [Alias('y')][switch]$Yes
 )
 
@@ -213,6 +221,30 @@ try {
       if (Test-Path (Join-Path $Target $bare)) { $sensitive.Add($u) | Out-Null }
     }
 
+    # F20: resolve autopilot_ai. Priority:
+    #   1. -Ai param (explicit operator choice)
+    #   2. probe `claude --version` then `codex --version`
+    #   3. fallback 'claude' (matches BOOTSTRAP.md preference)
+    $resolvedAi = $Ai
+    if (-not $resolvedAi) {
+      function Test-CliPresent {
+        param([string]$Cmd)
+        try {
+          $null = & $Cmd '--version' 2>$null
+          return ($LASTEXITCODE -eq 0)
+        } catch { return $false }
+      }
+      if (Test-CliPresent 'claude') {
+        $resolvedAi = 'claude'
+      } elseif (Test-CliPresent 'codex') {
+        $resolvedAi = 'codex'
+      } else {
+        $resolvedAi = 'claude'
+        Write-Host "[apply] neither claude nor codex CLI detected on PATH; defaulting autopilot_ai='claude'. Edit .autopilot/config.json after install if you actually use codex."
+      }
+    }
+    Write-Host "[apply] autopilot_ai=$resolvedAi"
+
     $cfg = [ordered]@{
       project_name           = $Name
       project_description    = $Description
@@ -223,7 +255,7 @@ try {
       search_roots           = $searchRoots
       sensitive_delete_paths = $sensitive
       template_version       = $TemplateVersion
-      autopilot_ai           = 'claude'
+      autopilot_ai           = $resolvedAi
       next_delay_default     = 900
     }
     $json = $cfg | ConvertTo-Json -Depth 5
