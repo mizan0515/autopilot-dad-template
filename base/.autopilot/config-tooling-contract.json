@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "_doc": "Round-7 F67 contract manifest. Each entry pins a config.json key to the tooling files that consume it. The consumer file's default value (extracted via the regex `pattern`, capture group 1) must match config.json's value when the operator sets the key explicitly. Validate-ConfigToolingDrift.ps1 enforces. Add a check entry per (config_key, consumer_file) pair when shipping a new tooling default that mirrors a config option.",
+  "checks": [
+    {
+      "config_key": "stale_draft_pr_hours",
+      "consumer_file": "tools/Validate-StaleStateDetection.ps1",
+      "pattern": "\\$stalePrHours\\s*=\\s*(\\d+)\\b",
+      "kind": "integer",
+      "detail": "Stale-draft-PR cap (hours). Config value must match the in-file default in Validate-StaleStateDetection.ps1 when the operator sets it explicitly."
+    }
+  ]
+}
