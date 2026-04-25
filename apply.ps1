@@ -306,15 +306,40 @@ try {
   # project's slug and rewrite metadata via Set-CodexSkillNamespace.ps1.
   $skillsRoot = Join-Path $Target '.agents/skills'
   $setNsTool  = Join-Path $Target 'tools/Set-CodexSkillNamespace.ps1'
+  # Derive a safe lowercase slug from the project name (used here and below).
+  $slug = ($Name.ToLowerInvariant() -replace '[^a-z0-9-]', '-').Trim('-')
+  if (-not $slug) { $slug = 'myproject' }
   if ((Test-Path $skillsRoot) -and (Test-Path $setNsTool)) {
-    # Derive a safe lowercase slug from the project name.
-    $slug = ($Name.ToLowerInvariant() -replace '[^a-z0-9-]', '-').Trim('-')
-    if (-not $slug) { $slug = 'myproject' }
     # Only rebrand if shipped defaults are still present.
     $hasDefault = Test-Path (Join-Path $skillsRoot 'cardgame-dialogue-start')
     if ($hasDefault -and $slug -ne 'cardgame') {
       Write-Host "[apply] rebranding Codex skills: cardgame-* -> $slug-*"
       & $setNsTool -Namespace $slug -RepoRoot $Target -ProjectLabel $Name | Out-Null
+    }
+  }
+
+  # --- Relay profile-stub rebranding ---------------------------------------
+  # Round-3 F24: relay/profile-stub/ ships JSON with `myproject-*` identity
+  # ids, skill names, and a `broker.myproject.json` filename. Set-CodexSkill-
+  # Namespace only touches .agents/skills/ — these stubs were left untouched,
+  # so an operator who copied them into their forked relay registered
+  # identities under the wrong names and DAD peer routing failed silently
+  # for scenario step 6. Now rewrite `myproject` → `<slug>` across all
+  # profile-stub JSON files and rename `broker.myproject.json` accordingly.
+  $relayStub = Join-Path $Target 'relay/profile-stub'
+  if ((Test-Path $relayStub) -and ($slug -ne 'myproject')) {
+    Write-Host "[apply] rebranding relay profile-stub: myproject -> $slug"
+    foreach ($f in Get-ChildItem -Path $relayStub -Filter '*.json' -File) {
+      $content = [IO.File]::ReadAllText($f.FullName)
+      $rewritten = $content -replace 'myproject', $slug
+      if ($rewritten -ne $content) {
+        [IO.File]::WriteAllText($f.FullName, $rewritten, (New-Object Text.UTF8Encoding $false))
+      }
+    }
+    $oldBroker = Join-Path $relayStub 'broker.myproject.json'
+    $newBroker = Join-Path $relayStub "broker.$slug.json"
+    if ((Test-Path $oldBroker) -and (-not (Test-Path $newBroker))) {
+      Move-Item -LiteralPath $oldBroker -Destination $newBroker
     }
   }
 
