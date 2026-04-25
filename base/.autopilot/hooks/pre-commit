@@ -56,6 +56,13 @@ fi
 # low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
 # PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
+# Round-7 F65: upstream-contract tripwire (soft). Compares each
+# tools/Validate-*.ps1 against .autopilot/upstream-contract.json
+# (SHA256 + line-count manifest the template ships at apply time).
+# Fires `truncated-fork-suspected` when an operator copies a
+# template validator but only brings half of it across — the R6
+# silent-invariant-loss case. Manifest absent → silent skip.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-UpstreamContract.ps1 -RepoRoot . -Soft
 # Round-7 F64: STATE.md self-reported timestamp invariant (soft).
 # Surfaces ISO8601 timestamps embedded in STATE.md that lead the
 # file's own mtime or the validator's wall clock by > skew (5 min
