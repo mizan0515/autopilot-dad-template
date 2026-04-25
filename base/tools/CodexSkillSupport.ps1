@@ -48,11 +48,23 @@ function Get-CodexSkillHome {
         return [System.IO.Path]::GetFullPath($SkillHome)
     }
 
+    # Round-3 F28: previous fallback was `Combine($env:USERPROFILE, '.codex')`
+    # which is Windows-only — `$env:USERPROFILE` is empty on macOS/Linux,
+    # producing a relative `.codex/skills` path that gets created under the
+    # current working directory instead of the operator's actual codex home.
+    # Codex CLI itself reads `$CODEX_HOME` then `$HOME/.codex` on POSIX and
+    # `%USERPROFILE%\.codex` on Windows; mirror that resolution order.
     $codexRoot = if ($env:CODEX_HOME) {
         [System.IO.Path]::GetFullPath($env:CODEX_HOME)
     }
-    else {
+    elseif ($env:USERPROFILE) {
         [System.IO.Path]::Combine($env:USERPROFILE, '.codex')
+    }
+    elseif ($env:HOME) {
+        [System.IO.Path]::Combine($env:HOME, '.codex')
+    }
+    else {
+        throw "Cannot resolve Codex home: neither CODEX_HOME, USERPROFILE, nor HOME is set. Pass -SkillHome explicitly."
     }
 
     return [System.IO.Path]::Combine($codexRoot, 'skills')
