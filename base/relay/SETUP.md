@@ -1,7 +1,8 @@
 # Relay setup
 
 The relay is a separate .NET-based broker. It lives in its own repo (typically a
-fork of a reference implementation like `cardgame-dad-relay`).
+fork of a reference DAD relay implementation; this template ships a minimal
+profile stub under `relay/profile-stub/` you can use as the starting point).
 
 ## Prerequisites
 
@@ -12,7 +13,7 @@ fork of a reference implementation like `cardgame-dad-relay`).
 ## 1. Clone or fork the reference relay
 
 ```sh
-# Example: fork cardgame-dad-relay to your own org, then clone
+# Example: fork your reference relay to your own org, then clone
 git clone https://github.com/<your-org>/<your-relay>.git D:\<your-relay>
 ```
 

@@ -170,9 +170,24 @@ if [ -f "$CFG" ]; then
   echo "[apply] existing config.json preserved at $CFG"
 else
   mkdir -p "$TARGET/.autopilot"
-  python3 - "$CFG" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" "$PRD_ARG" "$RELAY_ARG" "$TEMPLATE_VERSION" <<'PY'
-import json, sys, pathlib
-path, name, desc, directive, lang, prd, relay, tpl_ver = sys.argv[1:]
+  python3 - "$CFG" "$TARGET" "$NAME_ARG" "$DESC_ARG" "$DIRECTIVE_ARG" "$LANG_ARG" "$PRD_ARG" "$RELAY_ARG" "$TEMPLATE_VERSION" <<'PY'
+import json, os, sys, pathlib
+path, target, name, desc, directive, lang, prd, relay, tpl_ver = sys.argv[1:]
+
+# Round-3 F17: search_roots used to be a static array including Unity-only
+# `Assets/Scripts`/`Assets/Tests`. Now auto-detect.
+always_present = ['.autopilot', '.agents', '.prompts', 'tools']
+candidates = ['src','lib','tests','test','docs','Document','app','pkg','internal','cmd','Assets/Scripts','Assets/Tests']
+detected = [c for c in candidates if pathlib.Path(target, c).exists()]
+search_roots = detected + always_present
+
+# Round-3 F15: sensitive_delete_paths exposed as config so non-Unity projects
+# don't get checks against paths that don't exist.
+sensitive = ['Document/']  # universal — every DAD project has Document/dialogue/
+for u in ['Assets/Scripts/','Assets/Tests/','Assets/Prefabs/','src/','lib/','app/','pkg/','internal/','cmd/']:
+    if pathlib.Path(target, u.rstrip('/')).exists():
+        sensitive.append(u)
+
 cfg = {
     "project_name": name,
     "project_description": desc,
@@ -180,7 +195,8 @@ cfg = {
     "operator_language": lang,
     "prd_path": prd,
     "relay_repo_path": relay,
-    "search_roots": ["src","lib","tests","docs","Document","Assets/Scripts","Assets/Tests",".autopilot",".agents",".prompts","tools"],
+    "search_roots": search_roots,
+    "sensitive_delete_paths": sensitive,
     "template_version": tpl_ver,
     "autopilot_ai": "claude",
     "next_delay_default": 900,
@@ -262,7 +278,7 @@ fi
 # Prefer top-level .githooks/ (canonical validator chain).
 # Fall back to .autopilot/hooks/ for legacy layouts.
 if [ -d "$TARGET/.githooks" ]; then
-  chmod +x "$TARGET/.githooks/pre-commit" 2>/dev/null || true
+  chmod +x "$TARGET/.githooks/pre-commit" "$TARGET/.githooks/commit-msg" 2>/dev/null || true
   git config core.hooksPath .githooks
   echo "[apply] hooks registered (core.hooksPath=.githooks)"
 elif [ -d "$TARGET/.autopilot/hooks" ]; then
