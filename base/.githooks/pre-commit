@@ -52,3 +52,7 @@ fi
 # retained-dirty mismatches with actually-clean worktree, and open
 # draft PRs older than config.stale_draft_pr_hours (default 72h).
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-StaleStateDetection.ps1 -AutopilotRoot .autopilot -Soft
+# Round-5 F45: token-economy reporting (soft). Detects sustained
+# low cache_read_ratio (<0.25 for ≥2 consecutive iters) per
+# PROMPT.md budget IMMUTABLE. Skips rows without cache_read_ratio.
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-TokenEconomy.ps1 -AutopilotRoot .autopilot -Soft
