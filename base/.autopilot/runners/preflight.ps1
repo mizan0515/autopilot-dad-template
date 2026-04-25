@@ -206,6 +206,20 @@ if (Test-Path $evidenceValidator) {
   }
 }
 
+# 9. Round-4 F40: structured-failure-logging contract (soft check).
+#    When the last METRICS row's outcome is non-clean (anything except
+#    shipped / doc-only / idle-upkeep / bootstrap), expects a FAILURES
+#    row with the same run_id. Operator's real Unity-card-game audit
+#    found FAILURES.jsonl was empty despite multiple real failures.
+$failuresValidator = Join-Path $repoRoot 'tools/Validate-FailuresLogged.ps1'
+if (Test-Path $failuresValidator) {
+  try {
+    & $failuresValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] failures-logged validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"

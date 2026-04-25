@@ -96,6 +96,30 @@ iter 시작 직후:
 
 ---
 
+## 구조화된 실패 로깅 (round-4 F40)
+
+iter 의 outcome 이 아래 "clean" 집합 밖이라면 — 즉, 정상 종료가 아니라 실패/제외/지연/부분 완료/에스컬레이트 등이라면 — METRICS.jsonl 라인에 outcome 만 적는 것으로 끝내지 말 것. **반드시 같은 `run_id` 를 공유하는 FAILURES.jsonl 라인을 함께 추가**한다. 운영자 대시보드와 reconciliation 게이트는 FAILURES 만 스캔해서 "이 iter 에서 무엇이 잘못됐나" 를 묻는다 — METRICS 만 적고 FAILURES 를 비워두면 그 질문에 답할 수 없다.
+
+clean outcome (FAILURES 라인 불필요):
+- `shipped` — 코드 변경이 실제 배포됨
+- `doc-only` — 문서/메타데이터만 변경
+- `idle-upkeep` — 정비 턴 (PR 스윕, BACKLOG 정리 등)
+- `bootstrap` — iter 0 부트스트랩
+
+이 외의 모든 outcome (`excluded`, `blocked`, `escalated`, `partial`, `deferred`, `error`, `aborted`, `halted`, `abandoned`, `recovery`, 또는 그 외) 은 FAILURES.jsonl 라인을 동반해야 한다:
+
+```jsonl
+{"ts":"2026-04-25T14:00:00Z","run_id":"4e1b...","iter":118,"event":"outcome-non-clean","outcome":"blocked","reason":"Unity MCP runtime-bridge unresponsive; UX-visible task cannot satisfy F39 evidence gate","next_action":"escalate-to-operator"}
+```
+
+`event` 필드는 구체적이어야 한다 — `outcome-non-clean` 은 fallback 이고, 가능하면 `runtime-bridge-unresponsive`, `ledger-drift-detected`, `peer-handoff-failed`, `evidence-missing` 같은 도메인 이벤트로 적는다. `reason` 은 한 줄 이내로 운영자가 읽고 즉시 파악할 수 있게 적는다.
+
+운영자가 보고한 실사용 사고 (round-4): Unity-card-game `FAILURES.jsonl` 은 **비어 있었다** — runner 가 retained-dirty 로 15시간 멈춰 있었고, draft PR #292 가 방치됐고, Unity-MCP 가 9 PR 동안 미관측이었음에도. 실패가 없었던 게 아니라 구조화된 행을 적지 않았기 때문에 다운스트림 도구가 트리아지할 게 없었다. F40 가 그 갭을 닫는다.
+
+`tools/Validate-FailuresLogged.ps1` 가 이 계약을 강제한다 — 마지막 METRICS 라인의 outcome 이 비-clean 인데 같은 run_id 의 FAILURES 라인이 없으면 drift 로 보고한다.
+
+---
+
 ## 런타임 증거 인정 (round-4 F39)
 
 UX 가시 / 런타임 의존 작업 — `[ui]`, `[ux]`, `[ux-visible]`, `[runtime]`, `[playmode]`, `[scene]`, `[battle]`, `[gameplay]`, `[e2e]`, `[smoke]` 태그가 BACKLOG 또는 STATE 의 Active Task 에 붙은 iter — 가 `outcome:"shipped"` 를 주장할 때, METRICS.jsonl 라인은 반드시 `runtime_evidence` 객체를 포함한다. 그 객체는 아래 네 필드 중 **최소 하나** 가 비어 있지 않아야 한다:
