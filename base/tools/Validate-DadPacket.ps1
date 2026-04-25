@@ -324,6 +324,51 @@ function Validate-PacketFile {
         }
     }
 
+    # Round-6 F52 — closeout-kind disambiguation (universal, project-shape-agnostic).
+    #
+    # Real failure on the relay (`D:\cardgame-dad-relay`, HISTORY iter 18-19):
+    # a turn with a `handoff:` block, `ready_for_peer_verification: false`
+    # (or absent), `suggest_done: false` (or absent), and `next_task: <non-empty>`
+    # was treated as "I want the peer to continue, but I'm not ready yet."
+    # The broker silently dropped these as `handoff_write_failed`, the
+    # session ended green-looking with 0 turn YAMLs landed, and the operator
+    # had no audit trail.
+    #
+    # Universal lesson (applies to ANY DAD-using project — Python, web, CLI,
+    # game): a turn that declares forward intent (next_task) but doesn't
+    # commit to a closeout shape is ambiguous. Force the agent to pick one:
+    #   - `handoff.closeout_kind: peer_handoff`       (peer continues — needs ready=true + context + artifact)
+    #   - `handoff.closeout_kind: final_no_handoff`   (this turn ends the chain — needs done_reason)
+    #   - `handoff.closeout_kind: in_progress`        (self continues; no peer expected — next_task allowed empty)
+    #
+    # Backward compat: if `closeout_kind` is absent, infer from existing fields
+    # (`ready=true` ⇒ peer_handoff; `suggest_done=true` ⇒ final_no_handoff).
+    # Only fail when neither inference nor explicit kind disambiguates AND
+    # `next_task` is non-empty (the "ambiguous-but-claiming-forward" case).
+    $closeoutKindMatch = Get-RegexMatch -Text $text -Pattern '^\s+closeout_kind:\s*(?<value>[A-Za-z_]+)\s*$'
+    $closeoutKind = if ($closeoutKindMatch.Success) { $closeoutKindMatch.Groups['value'].Value } else { $null }
+    $allowedCloseoutKinds = @('peer_handoff', 'final_no_handoff', 'in_progress')
+
+    if ($null -ne $closeoutKind -and $allowedCloseoutKinds -notcontains $closeoutKind) {
+        Add-Issue -List $issues -Message "handoff.closeout_kind '$closeoutKind' is not one of: $($allowedCloseoutKinds -join ', ')."
+    }
+
+    $readyTrue = $handoffReady.Success -and $handoffReady.Groups['value'].Value -eq 'true'
+    $suggestTrue = $handoffSuggest.Success -and $handoffSuggest.Groups['value'].Value -eq 'true'
+    $nextTaskNonEmpty = -not [string]::IsNullOrWhiteSpace($nextTask)
+
+    if ($null -eq $closeoutKind -and -not $readyTrue -and -not $suggestTrue -and $nextTaskNonEmpty) {
+        Add-Issue -List $issues -Message "handoff has next_task but no closeout commitment (handoff.closeout_kind absent, ready_for_peer_verification!=true, suggest_done!=true). Set handoff.closeout_kind to one of: $($allowedCloseoutKinds -join ', ')."
+    }
+
+    if ($closeoutKind -eq 'peer_handoff' -and -not $readyTrue) {
+        Add-Issue -List $issues -Message "handoff.closeout_kind=peer_handoff requires handoff.ready_for_peer_verification=true (and the consequent context + prompt_artifact rules)."
+    }
+
+    if ($closeoutKind -eq 'final_no_handoff' -and -not (Test-Regex -Text $text -Pattern '^\s+done_reason:\s*\S+')) {
+        Add-Issue -List $issues -Message "handoff.closeout_kind=final_no_handoff requires handoff.done_reason."
+    }
+
     $hasPassCheckpoint = $checkpointResults.Found -and [regex]::IsMatch($checkpointResults.Block, '^\s+status:\s*PASS\s*$', [System.Text.RegularExpressions.RegexOptions]::Multiline)
     if ($hasPassCheckpoint -and -not (Test-Regex -Text $text -Pattern '^\s+evidence:\s*$|^\s+evidence:\s*\S+')) {
         Add-Issue -List $issues -Message "PASS checkpoint exists without visible evidence block."
