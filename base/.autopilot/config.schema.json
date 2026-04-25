@@ -49,6 +49,12 @@
       "items": { "type": "string" },
       "description": "Path prefixes whose deletion requires a 'cleanup-operator-approved: yes' commit trailer. Enforced by .autopilot/hooks/commit-msg-protect.sh. Auto-populated at apply time with detected source/test/docs trees; always includes 'Document/' for the DAD dialogue history.",
       "default": ["Document/"]
+    },
+    "runtime_evidence_tags": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Project-specific Active-Task tags that trigger the F39 runtime-evidence admission gate, in addition to the default engine-agnostic set ([ui], [ux], [ux-visible], [runtime], [e2e], [smoke]). Add tags like [playmode]/[scene]/[battle] for Unity projects, [browser]/[a11y] for web projects, [device]/[hw] for embedded, etc. Each tag must include the brackets, e.g. \"[playmode]\".",
+      "default": []
     }
   }
 }
