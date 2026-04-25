@@ -74,11 +74,18 @@ function Test-RequiresBom([string]$Path) {
         return $false
     }
 
-    if ($Path -match '\\Document\\') {
+    $normalized = $Path.Replace('/', '\')
+
+    # Round-3 F29: previous rule required BOM on every file under Document/,
+    # but that includes operator-authored content (Document/PRD.md, design
+    # docs, planning notes) which the operator writes without prepending a
+    # BOM. The template itself only manages BOM on the dialogue + DAD
+    # sub-trees (Document/dialogue/, Document/DAD/). Narrow the rule.
+    if ($normalized -match '\\Document\\dialogue\\' -or
+        $normalized -match '\\Document\\DAD\\') {
         return $true
     }
 
-    $normalized = $Path.Replace('/', '\')
     $rootNames = @('\AGENTS.md', '\CLAUDE.md', '\DIALOGUE-PROTOCOL.md', '\PROJECT-RULES.md')
     foreach ($rootName in $rootNames) {
         if ($normalized.EndsWith($rootName, [System.StringComparison]::OrdinalIgnoreCase)) {
