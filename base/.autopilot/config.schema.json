@@ -55,6 +55,22 @@
       "items": { "type": "string" },
       "description": "Project-specific Active-Task tags that trigger the F39 runtime-evidence admission gate, in addition to the default engine-agnostic set ([ui], [ux], [ux-visible], [runtime], [e2e], [smoke]). Add tags like [playmode]/[scene]/[battle] for Unity projects, [browser]/[a11y] for web projects, [device]/[hw] for embedded, etc. Each tag must include the brackets, e.g. \"[playmode]\".",
       "default": []
+    },
+    "stale_draft_pr_hours": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 72,
+      "description": "F44 stale-state validator threshold: open draft PRs not updated within this many hours are flagged as stale. Default 72h (3 days)."
+    },
+    "skip_draft_pr_check": {
+      "type": "boolean",
+      "default": false,
+      "description": "F44: set true to skip the gh-based draft-PR check. Useful in CI environments where gh isn't authenticated as the autopilot identity, or in repos that don't use draft PRs as the WIP convention."
+    },
+    "draft_pr_branch_prefix": {
+      "type": "string",
+      "default": "",
+      "description": "F44: optional filter — when non-empty, only draft PRs whose head branch starts with this prefix are checked for staleness. Example: \"dev/autopilot-\" to ignore non-autopilot drafts."
     }
   }
 }

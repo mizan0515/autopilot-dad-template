@@ -48,3 +48,7 @@ fi
 # Round-5 F42: HISTORY.md invariants (soft). Surfaces ordering
 # violations, duplicate iters, malformed headers, size cap exceeded.
 "$runner" -ExecutionPolicy Bypass -File tools/Validate-HistoryInvariants.ps1 -AutopilotRoot .autopilot -Soft
+# Round-5 F44: stale-state detection (soft). Surfaces RUNNER-LIVE
+# retained-dirty mismatches with actually-clean worktree, and open
+# draft PRs older than config.stale_draft_pr_hours (default 72h).
+"$runner" -ExecutionPolicy Bypass -File tools/Validate-StaleStateDetection.ps1 -AutopilotRoot .autopilot -Soft

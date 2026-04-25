@@ -251,6 +251,22 @@ if (Test-Path $historyValidator) {
   }
 }
 
+# 12. Round-5 F44: stale-state detection (soft check). (a) RUNNER-LIVE
+#     phase=retained-dirty + worktree actually clean → mismatch;
+#     (b) open draft PRs older than `config.stale_draft_pr_hours`
+#     (default 72h) → stale-PR alert. Operator's Unity-card-game
+#     finding: RUNNER-LIVE claimed retained-dirty for 15+ hours
+#     while the worktree was clean, and draft PR #292 sat open ~30
+#     days untouched.
+$staleStateValidator = Join-Path $repoRoot 'tools/Validate-StaleStateDetection.ps1'
+if (Test-Path $staleStateValidator) {
+  try {
+    & $staleStateValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] stale-state validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"
