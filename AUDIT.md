@@ -97,6 +97,31 @@ Rows 44–48 came from running the template end-to-end against a brand-new proje
 | 77 | F35 — `runner.ps1` had three literal-backslash path separators in PowerShell strings: `Join-Path $PSScriptRoot '..\..'` (line 8 Set-Location), `'.autopilot\PROMPT.md'` (line 16 default $promptRelative), `Join-Path $PSScriptRoot '..\config.json'` (line 124 F14 config.json fallback). PowerShell on Windows accepts forward slashes too, but on POSIX pwsh `\` is a literal char, not a separator. Effect on POSIX (macOS/Linux pwsh 7+): runner aborts at first `Set-Location` with "cannot resolve `..\..`" path; F14's config.json resolution returns false, silently regressing autopilot_ai to 'codex' default; `Test-Path` on default prompt fails before any AI invocation. Iter X sweep confirmed `tools/CodexSkillSupport.ps1` USERPROFILE only inside F28 fallback chain, no other backslash-only paths in PowerShell scripts | Replace `\` with `/` in three strings. Forward slashes work identically on Windows pwsh and POSIX pwsh; `Resolve-Path`/`Test-Path` normalize to platform-native form. Verified equivalence on Windows: both forms produce same resolved path | Round-3 (#59) | ✅ covered |
 | 78 | F36 — `runner.ps1` line 67 (post-F23) hardcoded `& powershell -NoProfile -ExecutionPolicy Bypass -File $projectScript status` for the dashboard refresh. `powershell` is the Windows PowerShell 5.1 binary, doesn't exist on macOS or Linux. So an operator running runner.ps1 via pwsh on a developer Mac/Linux container hit "powershell: The term 'powershell' is not recognized..." on every phase transition — the runner itself ran fine (inherited pwsh), only the *child* dashboard refresh failed. runner.sh side already had the correct resolver post-F23; the .ps1 mirror was missed. Operator scenario step 7 (web dashboard) silently never updated on POSIX | Add `Get-Command pwsh ?? powershell ?? null` resolver matching runner.sh pattern. If neither is on PATH, surface a Write-Warning and skip refresh (better than crashing inner call). Verified on Windows: resolver picks pwsh 7.6.1 first; refresh succeeds | Round-3 (#61) | ✅ covered |
 
+## Round-3 closure (iter Z final regression sweep)
+
+Iter Z dogfooded the post-F36 template against four distinct project shapes — `dogfood-py` (Python: `src/`, `tests/`), `dogfood-unity` (Unity-like: `Assets/Scripts`, `Document/PRD.md`), `dogfood-min` (minimal stub: only `README.md`), `dogfood-noprd` (operator without PRD; falls back to README per Detect-Prd). All four passed cleanly:
+
+| check | py | unity | min | noprd |
+|---|---|---|---|---|
+| `chore: apply autopilot-dad-template` | ✓ | ✓ | ✓ | ✓ |
+| `.githooks/*` index mode 100755 | ✓ | ✓ | ✓ | ✓ |
+| `cardgame` leaks in `.agents/skills/` | 0 | 0 | 0 | 0 |
+| `myproject` leaks in `relay/profile-stub/` | 0 | 0 | 0 | 0 |
+| unrendered `{{...}}` placeholders | 0 | 0 | 0 | 0 |
+
+Plus end-to-end on dogfood-py: preflight reports `ai=claude` (auto-detected per F20), tampering an `IMMUTABLE:budget` block is rejected (F12), `git rm src/index.py && git commit` blocked by sensitive-path trailer gate (F18 wiring + F15/F32 portable rebrand), `New-DadSession.ps1` + `New-DadTurn.ps1` produce parser-clean BOM-less JSON+YAML (F25), `Validate-DadPacket.ps1` accepts the freshly created session.
+
+**Round-3 shipped 36 distinct fixes (F1–F36) across 32 fix PRs + 32 audit PRs (#17–#62).** The headline finds:
+
+- **F18** — `commit-msg` trailer enforcement was silently disabled in every template-applied repo since template inception (`.githooks/commit-msg` shim was missing). Any agent could add new IMMUTABLE blocks or bulk-delete protected paths and the commit would land.
+- **F23** — `runner.{ps1,sh}` called `project.ps1 status-kr` with non-existent verb + named params → silently failed → `OPERATOR-LIVE.html` was never refreshed in any apply'd repo since template inception.
+- **F19** — three latent bugs in `commit-msg-protect.sh` (wrong regex syntax, missing `\|\| true`, initial-add false positive) that F18's wiring exposed; without the F18 shim the hook never ran, so the bugs hid.
+- **F26** — every `.sh` and `.githooks/*` shipped at git index mode 100644 (no exec bit). Windows operators publishing repos shipped non-executable scripts; macOS/Linux clones broke.
+- **F30/F31** — Windows PowerShell 5.1 prepended UTF-8 BOM to runtime JSONL (`RUNNER-LIVE.json`, `FAILURES.jsonl`, `METRICS.jsonl`), breaking `jq` per-line parsing and dashboard reads.
+- **Cross-platform sweep (F28/F32/F33/F34/F35/F36)** — six distinct GNU/BSD/POSIX/Windows-PS divergences that broke macOS or Linux operators (codex-home path, sed -i, date -Is, bash-4 lowercase, ps1 backslash separators, hardcoded `powershell` binary).
+
+The fix surface saturated by iter Y on the audit angles I could reach without an actual runner execution. Iters K (adjacent runner scripts), R (no-PRD shape + placeholders), and Z (cumulative regression) closed clean — three zero-finding iters confirms the round is at a stable resting point. Future work is best targeted at **observed runtime behavior** on real operator machines (macOS Apple Silicon, Linux containers, Windows PowerShell 5.1 stragglers) rather than further static analysis.
+
 ## Interpretation
 
 **76 of 78 rows have concrete safeguards** inside the template. The two remaining exceptions:
