@@ -111,23 +111,19 @@ If `apply` exits non-zero:
 
 After apply succeeds:
 ```
-.autopilot/runners/preflight.ps1 -AutopilotRoot .autopilot -Ai claude    # or -Ai codex
+.autopilot/runners/preflight.ps1
 ```
-(bash equivalent: `./.autopilot/runners/preflight.sh .autopilot claude`)
+(bash equivalent: `./.autopilot/runners/preflight.sh`)
 
 Expected final line: `preflight-ok`. If `preflight-failed:<reason>`, print the reason in the operator's language and stop.
 
-### Step 7 — Seed BACKLOG with real tasks (not the template seed items)
+The preflight resolves the autopilot AI from `config.json.autopilot_ai` (which `apply` auto-detected at install time — round-3 F20). You can override with `-Ai claude|codex|custom` (PowerShell) or as the second positional arg in bash if you want to test a different CLI.
 
-Read `.autopilot/BACKLOG.md`. It has seed items like "seed-task-1". Replace them with 1–3 actual first tasks for this project, based on the directive from Step 4.
+### Step 7 — Confirm BACKLOG bootstrap seed is in place
 
-Be concrete. Example good seeds for a card game:
-- `P1: Wire CharacterSelect → Map transition end-to-end`
-- `P2: Add placeholder battle loop with 3 sample cards`
+Read `.autopilot/BACKLOG.md`. Confirm it contains a single `[bootstrap]` task whose deliverable is "read PRD.md and rewrite this BACKLOG with 3-5 real tasks". This is what `apply` shipped (round-3 F13). The first autopilot iter will pick this `[bootstrap]` task, read the operator's PRD, and populate the real backlog automatically — you do **not** hand-type seed tasks here.
 
-Bad seeds (do not use):
-- "Build core mechanics" (too vague)
-- "Plan the project" (planning is Step 4, already done)
+If the `[bootstrap]` task is missing for any reason (operator hand-edited the seed, partial apply), restore it from `locales/<lang>/.autopilot/BACKLOG.md` in the template repo. Otherwise the first iter has no Active task and stalls.
 
 ### Step 8 — Commit the bootstrap
 
