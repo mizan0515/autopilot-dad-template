@@ -192,6 +192,20 @@ if (Test-Path $ledgerValidator) {
   }
 }
 
+# 8. Round-4 F39: runtime-evidence admission (soft check). When the most
+#    recent shipped METRICS row's Active Task carries a runtime-required
+#    tag, expects a `runtime_evidence` field with at least one concrete
+#    artifact reference. Engine-agnostic version of operator's Unity-MCP
+#    / Play-Mode finding.
+$evidenceValidator = Join-Path $repoRoot 'tools/Validate-RuntimeEvidence.ps1'
+if (Test-Path $evidenceValidator) {
+  try {
+    & $evidenceValidator -AutopilotRoot $AutopilotRoot -Soft 2>&1 | Out-Host
+  } catch {
+    Write-Warning "[preflight] runtime-evidence validator exception: $_"
+  }
+}
+
 if ($problems.Count -gt 0) {
   $reason = ($problems -join ',')
   Write-Host "[preflight] FAILED: $reason"

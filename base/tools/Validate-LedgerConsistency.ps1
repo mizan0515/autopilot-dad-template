@@ -91,7 +91,9 @@ function Get-JsonlTail {
   param([string]$Path, [int]$Count)
   if (-not (Test-Path -LiteralPath $Path)) { return @() }
   try {
-    $lines = Get-Content -LiteralPath $Path -Tail $Count -ErrorAction Stop
+    # Force array context — single-line files return String not String[]
+    # in PowerShell, and `$lines[0]` would yield the first CHAR.
+    $lines = @(Get-Content -LiteralPath $Path -Tail $Count -ErrorAction Stop)
     $rows = @()
     foreach ($line in $lines) {
       if ([string]::IsNullOrWhiteSpace($line)) { continue }
