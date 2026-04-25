@@ -46,8 +46,22 @@ write_runner_state() {
   "worktree_base": "$(get_worktree_base | sed 's/\\/\\\\/g')"
 }
 EOF
-  if resolve_cmd powershell >/dev/null && [ -f "$PROJECT_SCRIPT" ]; then
-    powershell -NoProfile -ExecutionPolicy Bypass -File "$PROJECT_SCRIPT" status-kr -RunRoot "$run_root" -Phase "$phase" -Note "$note" -ExitCode "$last_exit" >/dev/null
+  # Round-3 F23: previously invoked `status-kr -RunRoot ... -Phase ... -Note
+  # ... -ExitCode ...` but project.ps1's ValidateSet does not include
+  # `status-kr` and has no such named params. Every call was a silent
+  # parameter-binding failure swallowed by `>/dev/null`, so OPERATOR-LIVE.html
+  # was never refreshed. The phase/note context already lives in
+  # RUNNER-LIVE.json (just written above) which `status` reads, so the extra
+  # args were redundant anyway. Try pwsh first (cross-platform), fall through
+  # to powershell.exe on Windows-with-old-shells.
+  status_runner=""
+  if resolve_cmd pwsh >/dev/null; then status_runner="pwsh"
+  elif resolve_cmd powershell >/dev/null; then status_runner="powershell"
+  fi
+  if [ -n "$status_runner" ] && [ -f "$PROJECT_SCRIPT" ]; then
+    if ! "$status_runner" -NoProfile -ExecutionPolicy Bypass -File "$PROJECT_SCRIPT" status >/dev/null 2>&1; then
+      echo "[autopilot] dashboard refresh failed (project.ps1 status); continuing." >&2
+    fi
   fi
 }
 
