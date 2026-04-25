@@ -116,6 +116,19 @@ After round-3 closed at 78 rows, the operator returned with a real-world failure
 - **F40 (#70)** — `Validate-FailuresLogged.ps1`: structured failure-logging contract. Every non-clean outcome (anything outside `shipped`/`doc-only`/`idle-upkeep`/`bootstrap`) must come with a same-run_id FAILURES row. Pairs with PROMPT.md "Structured failure logging" section
 - **F41 (#72)** — `Validate-DadReportConsumption.ps1`: DAD report consumption gate. Scans `.autopilot/{reports,generated}/*.json` for needs-attention status; flags drift if not consumed via STATE/HISTORY mention or `consumed/` move. Closes the relay → autopilot consumption loop the operator's audit found broken
 
+### Round-5 final regression sweep (iter JJ)
+
+After F42-F45 landed, ran the same 4-shape regression sweep round-3 closed with (`dogfood-py` Python / `dogfood-unity` Unity / `dogfood-min` minimal / `dogfood-noprd` no-PRD). All four shapes apply cleanly, commit cleanly, and pass through every gate without false positives:
+
+| Shape | Apply | Chore commit | Hooks 100755 | Round-3 leaks (cardgame/myproject/{{}}) | F38 ledger | F39 evidence | F40 failures | F41 reports | F42 history | F44 stale | F45 tokens |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| py | ✓ | ✓ | ✓ | 0/0/0 | skip ✓ | n/a (no shipped row) | OK | skip ✓ | OK | OK | skip ✓ |
+| unity | ✓ | ✓ | ✓ | 0/0/0 | skip ✓ | n/a | OK | skip ✓ | OK | OK | skip ✓ |
+| min | ✓ | ✓ | ✓ | 0/0/0 | skip ✓ | n/a | OK | skip ✓ | OK | OK | skip ✓ |
+| noprd | ✓ | ✓ | ✓ | 0/0/0 | skip ✓ | n/a | OK | skip ✓ | OK | OK | skip ✓ |
+
+**Crucial discipline check passed**: non-relay projects (py / min / noprd) get clean `[token-economy] OK only 0 row(s) with cache_read_ratio` and `[dad-report-consumption] no reports ... skipping` — these gates produce zero noise on projects that don't use a DAD relay or don't yet report Anthropic prompt-cache stats. The universal/relay-only schema split (F45) and the consumption gate's silence-when-no-reports-exist (F41) keep the template universally applicable.
+
 ### Round-5 closure (post-round-4 operator P1/P2 follow-up + engine-agnostic discipline)
 
 Round-5 lands four engine-agnostic improvements after operator's post-round-4 audit + the explicit reminder to keep the template universal (template ships to Python / web / CLI / embedded / game projects alike, not just Unity):
