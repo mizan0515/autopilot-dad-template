@@ -281,9 +281,9 @@ fi
 # --- Codex skill rebranding ----------------------------------------------
 # If the template shipped default "cardgame-*" skills, rename them to the
 # project's slug and rewrite metadata via Set-CodexSkillNamespace.ps1.
+SLUG="$(printf '%s' "$NAME_ARG" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')"
+if [ -z "$SLUG" ]; then SLUG="myproject"; fi
 if [ -d "$TARGET/.agents/skills" ] && [ -f "$TARGET/tools/Set-CodexSkillNamespace.ps1" ]; then
-  SLUG="$(printf '%s' "$NAME_ARG" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')"
-  if [ -z "$SLUG" ]; then SLUG="myproject"; fi
   if [ -d "$TARGET/.agents/skills/cardgame-dialogue-start" ] && [ "$SLUG" != "cardgame" ]; then
     echo "[apply] rebranding Codex skills: cardgame-* -> ${SLUG}-*"
     if command -v pwsh >/dev/null 2>&1; then
@@ -293,6 +293,31 @@ if [ -d "$TARGET/.agents/skills" ] && [ -f "$TARGET/tools/Set-CodexSkillNamespac
     else
       echo "[apply] pwsh/powershell not found — skipping skill rebrand (you can run tools/Set-CodexSkillNamespace.ps1 -Namespace $SLUG manually)"
     fi
+  fi
+fi
+
+# --- Relay profile-stub rebranding ---------------------------------------
+# Round-3 F24: relay/profile-stub/ ships JSON with `myproject-*` identity ids
+# / skill names + a `broker.myproject.json` filename. Set-CodexSkillNamespace
+# only touches .agents/skills/, leaving these stubs unchanged. Operators who
+# copied them into their forked relay registered identities under wrong
+# names and DAD peer routing failed silently for scenario step 6.
+RELAY_STUB="$TARGET/relay/profile-stub"
+if [ -d "$RELAY_STUB" ] && [ "$SLUG" != "myproject" ]; then
+  echo "[apply] rebranding relay profile-stub: myproject -> ${SLUG}"
+  for f in "$RELAY_STUB"/*.json; do
+    [ -f "$f" ] || continue
+    if grep -q "myproject" "$f" 2>/dev/null; then
+      python3 -c "
+import sys, pathlib
+p = pathlib.Path(sys.argv[1])
+text = p.read_text(encoding='utf-8')
+p.write_text(text.replace('myproject', sys.argv[2]), encoding='utf-8')
+" "$f" "$SLUG" 2>/dev/null || sed -i "s/myproject/${SLUG}/g" "$f" 2>/dev/null || true
+    fi
+  done
+  if [ -f "$RELAY_STUB/broker.myproject.json" ] && [ ! -f "$RELAY_STUB/broker.${SLUG}.json" ]; then
+    mv "$RELAY_STUB/broker.myproject.json" "$RELAY_STUB/broker.${SLUG}.json"
   fi
 fi
 
