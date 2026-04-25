@@ -43,10 +43,15 @@ fi
 FAILURES="$AUTOPILOT_ROOT/FAILURES.jsonl"
 
 write_failure() {
-  python3 - "$FAILURES" "$@" <<'PY' 2>/dev/null || true
+  # Round-4 F37: stamp run_id when set by the runner so this preflight
+  # failure can be ledger-reconciled with the matching RUNNER-LIVE.json
+  # phase entry. Empty string when preflight is invoked standalone.
+  python3 - "$FAILURES" "${AUTOPILOT_RUN_ID:-}" "$@" <<'PY' 2>/dev/null || true
 import sys, json, datetime, os
-path, *pairs = sys.argv[1:]
+path, run_id, *pairs = sys.argv[1:]
 row = {'ts': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+if run_id:
+    row['run_id'] = run_id
 for pair in pairs:
     k, _, v = pair.partition('=')
     row[k] = v

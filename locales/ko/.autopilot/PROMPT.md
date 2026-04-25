@@ -96,6 +96,22 @@ iter 시작 직후:
 
 ---
 
+## 운영 원장 상관관계 (run_id, round-4 F37)
+
+각 iter 의 운영 장부는 동일 `run_id` 로 묶여야 한다. 러너가 iter 시작 시 UUID 를 생성해 `$env:AUTOPILOT_RUN_ID` (PowerShell) / `$AUTOPILOT_RUN_ID` (bash) 로 노출한다. 이 값을 그대로 `RUNNER-LIVE.json`, `FAILURES.jsonl` (preflight + stalled-fallback 라인) 에 박아 넣는다.
+
+**에이전트가 종료 계약 단계 1 에서 METRICS.jsonl 라인을 추가할 때, `run_id` 필드를 반드시 포함한다**:
+
+```jsonl
+{"ts":"2026-04-25T01:49:25Z","iter":118,"run_id":"4e1b...","tokens":12345,"duration_s":480,"outcome":"shipped","pr_url":"https://..."}
+```
+
+`$AUTOPILOT_RUN_ID` 가 비어 있으면 (러너 외부에서 수동 실행, debug, 마이그레이션) `run_id` 필드를 생략한다 — 가짜 값을 넣지 말 것.
+
+이 상관관계는 향후 `tools/Validate-LedgerConsistency.ps1` (F38) 가 RUNNER-LIVE 의 마지막 `run_id` 와 METRICS/FAILURES 의 tail 을 매칭해 운영 장부 drift 를 탐지하는 토대다. 운영자 시나리오에서 RUNNER-LIVE 가 `retained-dirty` 에 멈춰 있는데 STATE/HISTORY/METRICS 는 9 PR 만큼 진행됐던 실사용 사고 (round-4 발견) 가 이 상관관계 부재로 잡히지 않았다.
+
+---
+
 ## 프롬프트 경제성 (lite mode)
 
 실제 작업이 작은 iter (idle-upkeep, BACKLOG 정리, HISTORY 회전) 는 full prompt boot cost 가 지배한다. 슬림 변형본이 `.autopilot/PROMPT.lite.md` 에 있다. 러너 환경에서:

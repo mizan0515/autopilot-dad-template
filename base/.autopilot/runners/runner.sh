@@ -39,10 +39,12 @@ write_runner_state() {
   # heredoc would expand to an empty `ts` field, breaking JSON. Use the
   # POSIX-portable `date -u +%Y-%m-%dT%H:%M:%SZ` which produces a valid
   # ISO 8601 / RFC 3339 timestamp on both GNU and BSD.
+  # Round-4 F37: include run_id (set by main loop) for ledger correlation.
   cat >"$RUNNER_STATE" <<EOF
 {
   "ts": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
   "ai": "$AI",
+  "run_id": "${AUTOPILOT_RUN_ID:-}",
   "phase": "$phase",
   "run_root": "${run_root//\\/\\\\}",
   "note": "${note//\"/\\\"}",
@@ -157,7 +159,13 @@ while :; do
   ai_exit=0
   llm_timed_out=0
   preflight_failed=0
-  echo "[autopilot] iter start $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  # Round-4 F37: per-iter run_id UUID. See runner.ps1 comment for the
+  # ledger-reconciliation rationale. python3 is already a hard dep
+  # elsewhere in this script (heredoc writes); use it for UUID generation
+  # because uuidgen flag handling diverges between BSD and GNU.
+  RUN_ID="$(python3 -c 'import uuid; print(uuid.uuid4())' 2>/dev/null || printf '%s-%s' "$(date +%s)" "$$")"
+  export AUTOPILOT_RUN_ID="$RUN_ID"
+  echo "[autopilot] iter start $(date -u +%Y-%m-%dT%H:%M:%SZ) run_id=$RUN_ID"
 
   # --- Preflight --------------------------------------------------------
   preflight_script="$(cd "$(dirname "$0")" && pwd)/preflight.sh"
@@ -217,10 +225,12 @@ while :; do
     if [ "$ai_exit" -eq 124 ] || [ "$ai_exit" -eq 137 ]; then
       llm_timed_out=1
       echo "[autopilot] AI call exceeded ${LLM_TIMEOUT_MIN} min — killed (exit $ai_exit)." >&2
-      python3 - "$preflight_ap_root/FAILURES.jsonl" "$AI" "$LLM_TIMEOUT_MIN" <<'PY' 2>/dev/null || true
+      # Round-4 F37: include run_id for ledger-reconciliation correlation.
+      python3 - "$preflight_ap_root/FAILURES.jsonl" "$AI" "$LLM_TIMEOUT_MIN" "${AUTOPILOT_RUN_ID:-}" <<'PY' 2>/dev/null || true
 import sys, json, datetime, os
-path, ai, tmin = sys.argv[1:]
+path, ai, tmin, run_id = sys.argv[1:]
 row = {'ts': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+       'run_id': run_id,
        'event': 'llm-timeout', 'ai': ai, 'timeout_min': int(tmin)}
 os.makedirs(os.path.dirname(path), exist_ok=True)
 with open(path, 'a', encoding='utf-8') as f:
@@ -281,10 +291,12 @@ PY
       halt_reason="연속 $CONSECUTIVE_STALLS 회 stall 로 runner 자동 HALT. 최근: $final_state. 원인 확인 후 .autopilot/HALT 파일을 삭제하고 재시작."
       printf '%s\n' "$halt_reason" > "$HALT"
       echo "[autopilot] $halt_reason"
-      python3 - "$preflight_ap_root/FAILURES.jsonl" "$CONSECUTIVE_STALLS" "$STALL_HALT_THRESHOLD" "$final_state" <<'PY' 2>/dev/null || true
+      # Round-4 F37: include run_id for ledger-reconciliation correlation.
+      python3 - "$preflight_ap_root/FAILURES.jsonl" "$CONSECUTIVE_STALLS" "$STALL_HALT_THRESHOLD" "$final_state" "${AUTOPILOT_RUN_ID:-}" <<'PY' 2>/dev/null || true
 import sys, json, datetime, os
-path, cs, thr, fs = sys.argv[1:]
+path, cs, thr, fs, run_id = sys.argv[1:]
 row = {'ts': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+       'run_id': run_id,
        'event': 'consecutive-stall-halt',
        'consecutive': int(cs), 'threshold': int(thr), 'final_state': fs}
 os.makedirs(os.path.dirname(path), exist_ok=True)
