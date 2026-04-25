@@ -44,7 +44,19 @@ function Write-RunnerState {
   }
 
   ($state | ConvertTo-Json -Depth 4) | Set-Content -Path $runnerStatePath -Encoding utf8
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $projectScript status-kr -RunRoot $RunRoot -Phase $Phase -Note $Note -ExitCode $LastExitCode | Out-Null
+  # Round-3 F23: this used to call `status-kr -RunRoot $RunRoot -Phase $Phase
+  # -Note $Note -ExitCode $LastExitCode`, but project.ps1's ValidateSet does
+  # NOT include `status-kr` and it has no -RunRoot / -Phase / -Note /
+  # -ExitCode params. Result: every call was a silent ValidateSet/parameter-
+  # binding failure swallowed by `| Out-Null`, so OPERATOR-LIVE.html was
+  # NEVER refreshed in any template-applied repo. The phase/note context the
+  # runner just wrote to RUNNER-LIVE.json IS what `status` reads, so the
+  # extra args were redundant anyway. Now call just `status` and capture
+  # stderr for diagnostics if it fails.
+  $statusOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $projectScript status 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    Write-Warning "[autopilot] dashboard refresh failed (exit=$LASTEXITCODE): $($statusOut -join '; ')"
+  }
 }
 
 function New-IterationWorktree {
